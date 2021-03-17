@@ -1,7 +1,7 @@
 {
-  "name": "gl",
+  "name": "@kmamal/gl",
   "version": "4.9.0",
-  "description": "Creates a WebGL context without a window",
+  "description": "Creates a WebGL context with or without a window",
   "main": "index.js",
   "directories": {
     "test": "test"
@@ -13,14 +13,14 @@
   "scripts": {
     "test": "standard | snazzy && tape test/*.js | faucet",
     "rebuild": "node-gyp rebuild --verbose",
-    "prebuild": "prebuild --all --strip",
+    "prebuild": "prebuild -t 8.0.0 -t 9.0.0 -t 10.0.0 -t 11.0.0 -t 12.0.0 -t 14.0.0 --strip",
     "install": "prebuild-install || node-gyp rebuild"
   },
   "dependencies": {
     "bindings": "^1.5.0",
     "bit-twiddle": "^1.0.2",
     "glsl-tokenizer": "^2.0.2",
-    "nan": "^2.14.1",
+    "nan": "^2.14.0",
     "node-abi": "^2.18.0",
     "node-gyp": "^7.1.0",
     "prebuild-install": "^5.3.5"
@@ -37,7 +37,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/stackgl/headless-gl.git"
+    "url": "git://github.com/kmamal/headless-gl.git"
   },
   "keywords": [
     "webgl",
