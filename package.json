@@ -1,6 +1,6 @@
 {
   "name": "@kmamal/gl",
-  "version": "4.9.0",
+  "version": "4.9.0-1",
   "description": "Creates a WebGL context with or without a window",
   "main": "index.js",
   "directories": {
@@ -13,8 +13,8 @@
   "scripts": {
     "test": "standard | snazzy && tape test/*.js | faucet",
     "rebuild": "node-gyp rebuild --verbose",
-    "prebuild": "prebuild -t 8.0.0 -t 9.0.0 -t 10.0.0 -t 11.0.0 -t 12.0.0 -t 14.0.0 --strip",
-    "install": "prebuild-install || node-gyp rebuild"
+    "prebuild": "prebuild -t 8.0.0 -t 9.0.0 -t 10.0.0 -t 11.0.0 -t 12.0.0 -t 14.0.0 --strip --verbose",
+    "install": "prebuild-install --verbose || node-gyp rebuild --verbose"
   },
   "dependencies": {
     "bindings": "^1.5.0",
