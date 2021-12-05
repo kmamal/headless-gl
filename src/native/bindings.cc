@@ -38,6 +38,8 @@ NAN_MODULE_INIT(Init) {
   JS_GL_METHOD("_drawElementsInstanced", DrawElementsInstanced);
   JS_GL_METHOD("_vertexAttribDivisor", VertexAttribDivisor);
 
+  JS_GL_METHOD("swap", Swap);
+
   JS_GL_METHOD("getUniform", GetUniform);
   JS_GL_METHOD("uniform1f", Uniform1f);
   JS_GL_METHOD("uniform2f", Uniform2f);
