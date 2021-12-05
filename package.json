@@ -21,8 +21,8 @@
     "bit-twiddle": "^1.0.2",
     "glsl-tokenizer": "^2.0.2",
     "nan": "^2.15.0",
-    "node-abi": "^2.30.1",
-    "node-gyp": "^7.1.2",
+    "node-abi": "^3.5.0",
+    "node-gyp": "^8.4.1",
     "prebuild-install": "^7.0.0"
   },
   "devDependencies": {
