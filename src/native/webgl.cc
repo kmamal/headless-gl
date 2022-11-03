@@ -38,7 +38,8 @@ WebGLRenderingContext::WebGLRenderingContext(
   , bool premultipliedAlpha
   , bool preserveDrawingBuffer
   , bool preferLowPowerToHighPerformance
-  , bool failIfMajorPerformanceCaveat) :
+  , bool failIfMajorPerformanceCaveat
+  , EGLNativeWindowType* window) :
       state(GLCONTEXT_STATE_INIT)
     , unpack_flip_y(false)
     , unpack_premultiply_alpha(false)
@@ -100,12 +101,17 @@ WebGLRenderingContext::WebGLRenderingContext(
     return;
   }
 
-  EGLint surfaceAttribs[] = {
-        EGL_WIDTH,  (EGLint)width
-      , EGL_HEIGHT, (EGLint)height
-      , EGL_NONE
-  };
-  surface = eglCreatePbufferSurface(DISPLAY, config, surfaceAttribs);
+  if (window) {
+    surface = eglCreateWindowSurface(DISPLAY, config, *window, nullptr);
+  } else {
+    EGLint surfaceAttribs[] = {
+          EGL_WIDTH,  (EGLint)width
+        , EGL_HEIGHT, (EGLint)height
+        , EGL_NONE
+    };
+    surface = eglCreatePbufferSurface(DISPLAY, config, surfaceAttribs);
+  }
+
   if (surface == EGL_NO_SURFACE) {
     state = GLCONTEXT_STATE_ERROR;
     return;
@@ -144,6 +150,17 @@ WebGLRenderingContext::WebGLRenderingContext(
   } else if(strstr(extensionString, "GL_OES_depth24")) {
     preferredDepth = GL_DEPTH_COMPONENT24_OES;
   }
+}
+
+bool WebGLRenderingContext::swap() {
+  if (state != GLCONTEXT_STATE_OK) {
+    return false;
+  }
+  if (!eglSwapBuffers(DISPLAY, surface)) {
+    state = GLCONTEXT_STATE_ERROR;
+    return false;
+  }
+  return true;
 }
 
 bool WebGLRenderingContext::setActive() {
@@ -258,6 +275,10 @@ GL_METHOD(DisposeAll) {
 GL_METHOD(New) {
   Nan::HandleScope();
 
+  EGLNativeWindowType* window = info[10]->IsUndefined()
+    ? nullptr
+    : *Nan::TypedArrayContents<EGLNativeWindowType>(info[10]);
+
   WebGLRenderingContext* instance = new WebGLRenderingContext(
       Nan::To<int32_t>(info[0]).ToChecked()   //Width
     , Nan::To<int32_t>(info[1]).ToChecked()   //Height
@@ -269,6 +290,7 @@ GL_METHOD(New) {
     , (Nan::To<bool>(info[7]).ToChecked()) //preserve drawing buffer
     , (Nan::To<bool>(info[8]).ToChecked()) //low power
     , (Nan::To<bool>(info[9]).ToChecked()) //fail if crap
+    , window
   );
 
   if(instance->state != GLCONTEXT_STATE_OK){
@@ -284,6 +306,12 @@ GL_METHOD(Destroy) {
   GL_BOILERPLATE
 
   inst->dispose();
+}
+
+GL_METHOD(Swap) {
+  GL_BOILERPLATE;
+
+  inst->swap();
 }
 
 GL_METHOD(Uniform1f) {
@@ -1639,7 +1667,7 @@ GL_METHOD(GetTexParameter) {
 
   GLenum target     = Nan::To<int32_t>(info[0]).ToChecked();
   GLenum pname      = Nan::To<int32_t>(info[1]).ToChecked();
-  
+
   if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT) {
     GLfloat param_value = 0;
     (inst->glGetTexParameterfv)(target, pname, &param_value);
