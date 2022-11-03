@@ -1,7 +1,7 @@
 {
-  "name": "gl",
-  "version": "6.0.1",
-  "description": "Creates a WebGL context without a window",
+  "name": "@kmamal/gl",
+  "version": "6.0.1-0",
+  "description": "Fork of `gl` that can render to windows",
   "main": "index.js",
   "directories": {
     "test": "test"
@@ -37,7 +37,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/stackgl/headless-gl.git"
+    "url": "git://github.com/kmamal/headless-gl.git"
   },
   "keywords": [
     "webgl",
