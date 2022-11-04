@@ -1,0 +1,39 @@
+name: Build and upload
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.platform.name }} Node.js v${{ matrix.node }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: 'Linux (x64)'   ,os: ubuntu-22.04              }
+          - { name: 'Windows (x64)' ,os: windows-2022              }
+          - { name: 'Mac (x64)'     ,os: macos-12                  }
+          - { name: 'Mac (arm64)'   ,os: macos-12     ,arch: arm64 }
+        node: [ 14, 16, 18, 19, 20 ]
+
+    runs-on: ${{ matrix.platform.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - if: ${{ startsWith(matrix.platform.os, 'ubuntu-') }}
+        run: ./scripts/install-deps-ubuntu.sh
+
+      - run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROSS_COMPILE_ARCH: ${{ matrix.platform.arch }}
