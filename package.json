@@ -1,9 +1,16 @@
 {
-  "name": "gl",
-  "version": "8.1.6",
-  "description": "Creates a WebGL context without a window",
-  "main": "index.js",
-  "browser": "src/javascript/browser-index.js",
+  "name": "@kmamal/gl",
+  "version": "8.1.6-0",
+  "description": "Fork of `gl` that can render to windows",
+  "main": "./index.js",
+  "browser": "./src/javascript/browser-index.js",
+  "types": "./src/types/index.d.ts",
+  "exports": {
+    ".": {
+      "default": "./index.js",
+      "types": "./src/types/index.d.ts"
+    }
+  },
   "directories": {
     "test": "test"
   },
@@ -12,9 +19,12 @@
   },
   "scripts": {
     "test": "standard | snazzy && tape test/*.js | faucet",
-    "rebuild": "node-gyp rebuild --verbose",
-    "prebuild": "prebuild --all --strip",
-    "install": "prebuild-install || node-gyp rebuild"
+    "install": "cd scripts && node install.mjs",
+    "download-release": "cd scripts && node download-release.mjs",
+    "build": "cd scripts && node build.mjs",
+    "upload-release": "cd scripts && node upload-release.mjs",
+    "release": "cd scripts && node release.mjs",
+    "clean": "cd scripts && node clean.mjs"
   },
   "dependencies": {
     "bindings": "^1.5.0",
@@ -23,21 +33,20 @@
     "nan": "^2.22.0",
     "node-abi": "^3.71.0",
     "node-gyp": "^10.2.0",
-    "prebuild-install": "^7.1.2"
+    "tar": "^6.1.15"
   },
   "devDependencies": {
     "angle-normals": "^1.0.0",
     "bunny": "^1.0.1",
     "faucet": "^0.0.4",
     "gl-conformance": "^2.0.9",
-    "prebuild": "^13.0.1",
     "snazzy": "^9.0.0",
     "standard": "^17.1.2",
     "tape": "^5.9.0"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/stackgl/headless-gl.git"
+    "url": "git+ssh://github.com/kmamal/headless-gl.git"
   },
   "keywords": [
     "webgl",
