@@ -34,8 +34,7 @@ gl.swap()
 Clone this repository and initialize submodules. Then run the "npm install" command.
 
 ```shell
-git clone https://github.com/liplum/headless-gl-esm.git
-cd headless-gl-esm
+cd <your-folder>
 git submodule init
 git submodule update
 
