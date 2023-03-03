@@ -1,8 +1,8 @@
-const { Linkable } = require('./linkable')
-const { gl } = require('./native-gl')
+import { Linkable } from './linkable.js'
+import { gl } from './native-gl.js'
 
-class WebGLProgram extends Linkable {
-  constructor (_, ctx) {
+export class WebGLProgram extends Linkable {
+  constructor(_, ctx) {
     super(_)
     this._ctx = ctx
     this._linkCount = 0
@@ -12,11 +12,9 @@ class WebGLProgram extends Linkable {
     this._uniforms = []
   }
 
-  _performDelete () {
+  _performDelete() {
     const ctx = this._ctx
     delete ctx._programs[this._ | 0]
     gl.deleteProgram.call(ctx, this._ | 0)
   }
 }
-
-module.exports = { WebGLProgram }

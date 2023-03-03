@@ -1,6 +1,6 @@
-const { gl } = require('../native-gl')
+import { gl } from '../native-gl.js'
 
-class WebGLDrawBuffers {
+export class WebGLDrawBuffers {
   constructor (ctx) {
     this.ctx = ctx
     const exts = ctx.getSupportedExtensions()
@@ -69,7 +69,7 @@ class WebGLDrawBuffers {
   }
 }
 
-function getWebGLDrawBuffers (ctx) {
+export function getWebGLDrawBuffers (ctx) {
   const exts = ctx.getSupportedExtensions()
 
   if (exts && exts.indexOf('WEBGL_draw_buffers') >= 0) {
@@ -77,9 +77,4 @@ function getWebGLDrawBuffers (ctx) {
   } else {
     return null
   }
-}
-
-module.exports = {
-  getWebGLDrawBuffers,
-  WebGLDrawBuffers
 }

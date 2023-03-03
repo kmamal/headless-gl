@@ -1,5 +1,5 @@
-class WebGLUniformLocation {
-  constructor (_, program, info) {
+export class WebGLUniformLocation {
+  constructor(_, program, info) {
     this._ = _
     this._program = program
     this._linkCount = program._linkCount
@@ -7,5 +7,3 @@ class WebGLUniformLocation {
     this._array = null
   }
 }
-
-module.exports = { WebGLUniformLocation }

@@ -1,4 +1,4 @@
-class Linkable {
+export class Linkable {
   constructor (_) {
     this._ = _
     this._references = []
@@ -46,5 +46,3 @@ class Linkable {
 
   _performDelete () {}
 }
-
-module.exports = { Linkable }

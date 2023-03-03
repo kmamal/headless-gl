@@ -1,10 +1,10 @@
-class OESStandardDerivatives {
+export class OESStandardDerivatives {
   constructor () {
     this.FRAGMENT_SHADER_DERIVATIVE_HINT_OES = 0x8B8B
   }
 }
 
-function getOESStandardDerivatives (context) {
+export function getOESStandardDerivatives (context) {
   let result = null
   const exts = context.getSupportedExtensions()
 
@@ -14,5 +14,3 @@ function getOESStandardDerivatives (context) {
 
   return result
 }
-
-module.exports = { getOESStandardDerivatives, OESStandardDerivatives }

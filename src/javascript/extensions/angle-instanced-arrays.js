@@ -1,7 +1,7 @@
-const { gl } = require('../native-gl')
-const { vertexCount } = require('../utils')
+import { gl }  from '../native-gl.js'
+import { vertexCount } from '../utils.js'
 
-class ANGLEInstancedArrays {
+export class ANGLEInstancedArrays {
   constructor (ctx) {
     this.VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE = 0x88fe
     this.ctx = ctx
@@ -217,8 +217,6 @@ class ANGLEInstancedArrays {
   }
 }
 
-function getANGLEInstancedArrays (ctx) {
+export function getANGLEInstancedArrays (ctx) {
   return new ANGLEInstancedArrays(ctx)
 }
-
-module.exports = { ANGLEInstancedArrays, getANGLEInstancedArrays }

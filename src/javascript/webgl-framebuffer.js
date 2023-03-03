@@ -1,7 +1,7 @@
-const { Linkable } = require('./linkable')
-const { gl } = require('./native-gl')
+import { Linkable } from './linkable.js'
+import { gl } from './native-gl.js'
 
-class WebGLFramebuffer extends Linkable {
+export class WebGLFramebuffer extends Linkable {
   constructor (_, ctx) {
     super(_)
     this._ctx = ctx
@@ -118,5 +118,3 @@ class WebGLFramebuffer extends Linkable {
     gl.deleteFramebuffer.call(ctx, this._ | 0)
   }
 }
-
-module.exports = { WebGLFramebuffer }

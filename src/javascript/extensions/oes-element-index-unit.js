@@ -1,6 +1,6 @@
-class OESElementIndexUint {}
+export class OESElementIndexUint {}
 
-function getOESElementIndexUint (context) {
+export function getOESElementIndexUint (context) {
   let result = null
   const exts = context.getSupportedExtensions()
 
@@ -10,5 +10,3 @@ function getOESElementIndexUint (context) {
 
   return result
 }
-
-module.exports = { getOESElementIndexUint, OESElementIndexUint }

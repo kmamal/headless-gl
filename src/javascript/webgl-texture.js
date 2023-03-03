@@ -1,7 +1,7 @@
-const { Linkable } = require('./linkable')
-const { gl } = require('./native-gl')
+import { Linkable } from './linkable.js'
+import { gl } from './native-gl.js'
 
-class WebGLTexture extends Linkable {
+export class WebGLTexture extends Linkable {
   constructor (_, ctx) {
     super(_)
     this._ctx = ctx
@@ -19,5 +19,3 @@ class WebGLTexture extends Linkable {
     gl.deleteTexture.call(ctx, this._ | 0)
   }
 }
-
-module.exports = { WebGLTexture }

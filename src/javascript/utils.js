@@ -1,8 +1,8 @@
-const { gl } = require('./native-gl')
+import { gl } from './native-gl.js'
 
-const { WebGLUniformLocation } = require('./webgl-uniform-location')
+import { WebGLUniformLocation } from './webgl-uniform-location.js'
 
-function bindPublics (props, wrapper, privateInstance, privateMethods) {
+export function bindPublics(props, wrapper, privateInstance, privateMethods) {
   for (let i = 0; i < props.length; i++) {
     const prop = props[i]
     const value = privateInstance[prop]
@@ -21,18 +21,18 @@ function bindPublics (props, wrapper, privateInstance, privateMethods) {
   }
 }
 
-function checkObject (object) {
+export function checkObject(object) {
   return typeof object === 'object' ||
     (object === undefined)
 }
 
-function checkUniform (program, location) {
+export function checkUniform(program, location) {
   return location instanceof WebGLUniformLocation &&
     location._program === program &&
     location._linkCount === program._linkCount
 }
 
-function isTypedArray (data) {
+export function isTypedArray(data) {
   return data instanceof Uint8Array ||
     data instanceof Uint8ClampedArray ||
     data instanceof Int8Array ||
@@ -45,13 +45,13 @@ function isTypedArray (data) {
 }
 
 // Don't allow: ", $, `, @, \, ', \0
-function isValidString (str) {
+export function isValidString(str) {
   // Remove comments first
   const c = str.replace(/(?:\/\*(?:[\s\S]*?)\*\/)|(?:([\s;])+\/\/(?:.*)$)/gm, '')
   return !(/["$`@\\'\0]/.test(c))
 }
 
-function vertexCount (primitive, count) {
+export function vertexCount(primitive, count) {
   switch (primitive) {
     case gl.TRIANGLES:
       return count - (count % 3)
@@ -76,7 +76,7 @@ function vertexCount (primitive, count) {
   }
 }
 
-function typeSize (type) {
+export function typeSize(type) {
   switch (type) {
     case gl.UNSIGNED_BYTE:
     case gl.BYTE:
@@ -92,7 +92,7 @@ function typeSize (type) {
   return 0
 }
 
-function uniformTypeSize (type) {
+export function uniformTypeSize(type) {
   switch (type) {
     case gl.BOOL_VEC4:
     case gl.INT_VEC4:
@@ -121,13 +121,13 @@ function uniformTypeSize (type) {
   }
 }
 
-function unpackTypedArray (array) {
+export function unpackTypedArray(array) {
   return (new Uint8Array(array.buffer)).subarray(
     array.byteOffset,
     array.byteLength + array.byteOffset)
 }
 
-function extractImageData (pixels) {
+export function extractImageData(pixels) {
   if (typeof pixels === 'object' && typeof pixels.width !== 'undefined' && typeof pixels.height !== 'undefined') {
     if (typeof pixels.data !== 'undefined') {
       return pixels
@@ -159,7 +159,7 @@ function extractImageData (pixels) {
   return null
 }
 
-function formatSize (internalFormat) {
+export function formatSize(internalFormat) {
   switch (internalFormat) {
     case gl.ALPHA:
     case gl.LUMINANCE:
@@ -174,7 +174,7 @@ function formatSize (internalFormat) {
   return 0
 }
 
-function convertPixels (pixels) {
+export function convertPixels(pixels) {
   if (typeof pixels === 'object' && pixels !== null) {
     if (pixels instanceof ArrayBuffer) {
       return new Uint8Array(pixels)
@@ -190,7 +190,7 @@ function convertPixels (pixels) {
   return null
 }
 
-function checkFormat (format) {
+export function checkFormat(format) {
   return (
     format === gl.ALPHA ||
     format === gl.LUMINANCE_ALPHA ||
@@ -199,28 +199,11 @@ function checkFormat (format) {
     format === gl.RGBA)
 }
 
-function validCubeTarget (target) {
+export function validCubeTarget(target) {
   return target === gl.TEXTURE_CUBE_MAP_POSITIVE_X ||
     target === gl.TEXTURE_CUBE_MAP_NEGATIVE_X ||
     target === gl.TEXTURE_CUBE_MAP_POSITIVE_Y ||
     target === gl.TEXTURE_CUBE_MAP_NEGATIVE_Y ||
     target === gl.TEXTURE_CUBE_MAP_POSITIVE_Z ||
     target === gl.TEXTURE_CUBE_MAP_NEGATIVE_Z
-}
-
-module.exports = {
-  bindPublics,
-  checkObject,
-  isTypedArray,
-  isValidString,
-  vertexCount,
-  typeSize,
-  uniformTypeSize,
-  unpackTypedArray,
-  extractImageData,
-  formatSize,
-  checkFormat,
-  checkUniform,
-  convertPixels,
-  validCubeTarget
 }

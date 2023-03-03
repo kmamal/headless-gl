@@ -1,11 +1,11 @@
-class EXTBlendMinMax {
-  constructor () {
+export class EXTBlendMinMax {
+  constructor() {
     this.MIN_EXT = 0x8007
     this.MAX_EXT = 0x8008
   }
 }
 
-function getEXTBlendMinMax (context) {
+export function getEXTBlendMinMax(context) {
   let result = null
   const exts = context.getSupportedExtensions()
 
@@ -15,5 +15,3 @@ function getEXTBlendMinMax (context) {
 
   return result
 }
-
-module.exports = { getEXTBlendMinMax, EXTBlendMinMax }

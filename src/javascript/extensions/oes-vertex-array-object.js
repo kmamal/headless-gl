@@ -1,17 +1,16 @@
-const { Linkable } = require('../linkable')
-const { gl } = require('../native-gl')
-const { checkObject } = require('../utils')
-const { WebGLVertexArrayObjectState } = require('../webgl-vertex-attribute')
-
-class WebGLVertexArrayObjectOES extends Linkable {
-  constructor (_, ctx, ext) {
+import { Linkable } from '../linkable.js'
+import { gl } from '../native-gl.js'
+import { checkObject } from '../utils.js'
+import { WebGLVertexArrayObjectState } from '../webgl-vertex-attribute.js'
+export class WebGLVertexArrayObjectOES extends Linkable {
+  constructor(_, ctx, ext) {
     super(_)
     this._ctx = ctx
     this._ext = ext
     this._vertexState = new WebGLVertexArrayObjectState(ctx)
   }
 
-  _performDelete () {
+  _performDelete() {
     // Clean up the vertex state to release references to buffers.
     this._vertexState.cleanUp()
 
@@ -21,8 +20,8 @@ class WebGLVertexArrayObjectOES extends Linkable {
   }
 }
 
-class OESVertexArrayObject {
-  constructor (ctx) {
+export class OESVertexArrayObject {
+  constructor(ctx) {
     this.VERTEX_ARRAY_BINDING_OES = 0x85B5
 
     this._ctx = ctx
@@ -30,7 +29,7 @@ class OESVertexArrayObject {
     this._activeVertexArrayObject = null
   }
 
-  createVertexArrayOES () {
+  createVertexArrayOES() {
     const { _ctx: ctx } = this
     const arrayId = gl.createVertexArrayOES.call(ctx)
     if (arrayId <= 0) return null
@@ -39,7 +38,7 @@ class OESVertexArrayObject {
     return array
   }
 
-  deleteVertexArrayOES (array) {
+  deleteVertexArrayOES(array) {
     const { _ctx: ctx } = this
     if (!checkObject(array)) {
       throw new TypeError('deleteVertexArrayOES(WebGLVertexArrayObjectOES)')
@@ -63,7 +62,7 @@ class OESVertexArrayObject {
     array._checkDelete()
   }
 
-  bindVertexArrayOES (array) {
+  bindVertexArrayOES(array) {
     const { _ctx: ctx, _activeVertexArrayObject: activeVertexArrayObject } = this
     if (!checkObject(array)) {
       throw new TypeError('bindVertexArrayOES(WebGLVertexArrayObjectOES)')
@@ -102,14 +101,14 @@ class OESVertexArrayObject {
     this._activeVertexArrayObject = array
   }
 
-  isVertexArrayOES (object) {
+  isVertexArrayOES(object) {
     const { _ctx: ctx } = this
     if (!ctx._isObject(object, 'isVertexArrayOES', WebGLVertexArrayObjectOES)) return false
     return gl.isVertexArrayOES.call(ctx, object._ | 0)
   }
 }
 
-function getOESVertexArrayObject (ctx) {
+export function getOESVertexArrayObject(ctx) {
   const exts = ctx.getSupportedExtensions()
 
   if (exts && exts.indexOf('OES_vertex_array_object') >= 0) {
@@ -117,10 +116,4 @@ function getOESVertexArrayObject (ctx) {
   } else {
     return null
   }
-}
-
-module.exports = {
-  WebGLVertexArrayObjectOES,
-  OESVertexArrayObject,
-  getOESVertexArrayObject
 }

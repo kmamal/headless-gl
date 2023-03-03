@@ -1,6 +1,6 @@
-class OESTextureFloatLinear {}
+export class OESTextureFloatLinear {}
 
-function getOESTextureFloatLinear (context) {
+export function getOESTextureFloatLinear (context) {
   let result = null
   const exts = context.getSupportedExtensions()
 
@@ -10,5 +10,3 @@ function getOESTextureFloatLinear (context) {
 
   return result
 }
-
-module.exports = { getOESTextureFloatLinear, OESTextureFloatLinear }

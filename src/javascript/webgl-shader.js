@@ -1,7 +1,7 @@
-const { gl } = require('./native-gl')
-const { Linkable } = require('./linkable')
+import { gl } from './native-gl.js'
+import { Linkable } from './linkable.js'
 
-class WebGLShader extends Linkable {
+export class WebGLShader extends Linkable {
   constructor (_, ctx, type) {
     super(_)
     this._type = type
@@ -17,5 +17,3 @@ class WebGLShader extends Linkable {
     gl.deleteShader.call(ctx, this._ | 0)
   }
 }
-
-module.exports = { WebGLShader }

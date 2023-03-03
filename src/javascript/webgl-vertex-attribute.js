@@ -1,7 +1,7 @@
-const { gl } = require('./native-gl')
-const { WebGLBuffer } = require('./webgl-buffer')
+import { gl } from './native-gl.js'
+import { WebGLBuffer } from './webgl-buffer.js'
 
-class WebGLVertexArrayObjectAttribute {
+export class WebGLVertexArrayObjectAttribute {
   constructor (ctx, idx) {
     this._ctx = ctx
     this._idx = idx
@@ -22,14 +22,14 @@ class WebGLVertexArrayObjectAttribute {
   }
 }
 
-class WebGLVertexArrayGlobalAttribute {
+export class WebGLVertexArrayGlobalAttribute {
   constructor (idx) {
     this._idx = idx
     this._data = new Float32Array([0, 0, 0, 1])
   }
 }
 
-class WebGLVertexArrayObjectState {
+export class WebGLVertexArrayObjectState {
   constructor (ctx) {
     const numAttribs = ctx.getParameter(ctx.MAX_VERTEX_ATTRIBS)
     this._attribs = new Array(numAttribs)
@@ -119,7 +119,7 @@ class WebGLVertexArrayObjectState {
   }
 }
 
-class WebGLVertexArrayGlobalState {
+export class WebGLVertexArrayGlobalState {
   constructor (ctx) {
     const numAttribs = ctx.getParameter(ctx.MAX_VERTEX_ATTRIBS)
     this._attribs = new Array(numAttribs)
@@ -145,11 +145,4 @@ class WebGLVertexArrayGlobalState {
       this._arrayBufferBinding = buffer
     }
   }
-}
-
-module.exports = {
-  WebGLVertexArrayObjectAttribute,
-  WebGLVertexArrayGlobalAttribute,
-  WebGLVertexArrayObjectState,
-  WebGLVertexArrayGlobalState
 }

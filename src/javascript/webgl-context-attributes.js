@@ -1,4 +1,4 @@
-class WebGLContextAttributes {
+export class WebGLContextAttributes {
   constructor (
     alpha,
     depth,
@@ -19,4 +19,3 @@ class WebGLContextAttributes {
   }
 }
 
-module.exports = { WebGLContextAttributes }

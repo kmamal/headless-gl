@@ -1,21 +1,21 @@
 /* eslint-disable */
 
-const bits = require('bit-twiddle')
-const { WebGLContextAttributes } = require('./webgl-context-attributes')
-const { WebGLRenderingContext, wrapContext } = require('./webgl-rendering-context')
-const { WebGLTextureUnit } = require('./webgl-texture-unit')
-const { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } = require('./webgl-vertex-attribute')
+import bits from 'bit-twiddle'
+import { WebGLContextAttributes }  from './webgl-context-attributes.js'
+import { WebGLRenderingContext, wrapContext }  from './webgl-rendering-context.js'
+import { WebGLTextureUnit } from './webgl-texture-unit.js'
+import { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } from './webgl-vertex-attribute.js'
 
 let CONTEXT_COUNTER = 0
 
-function flag (options, name, dflt) {
+function flag(options, name, dflt) {
   if (!options || !(typeof options === 'object') || !(name in options)) {
     return dflt
   }
   return !!options[name]
 }
 
-export function createContext (width, height, options) {
+export function createContext(width, height, options) {
   width = width | 0
   height = height | 0
   if (!(width > 0 && height > 0)) {
@@ -53,7 +53,7 @@ export function createContext (width, height, options) {
       contextAttributes.preferLowPowerToHighPerformance,
       contextAttributes.failIfMajorPerformanceCaveat,
       window)
-  } catch (e) {}
+  } catch (e) { }
   if (!ctx) {
     return null
   }
