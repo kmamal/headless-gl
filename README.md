@@ -28,3 +28,16 @@ gl.clearColor(1, 0, 0, 1)
 gl.clear(gl.COLOR_BUFFER_BIT)
 gl.swap()
 ```
+
+## Development
+
+Clone this repository and initialize submodules. Then run the "npm install" command.
+
+```shell
+git clone https://github.com/liplum/headless-gl-esm.git
+cd headless-gl-esm
+git submodule init
+git submodule update
+
+npm install
+```
