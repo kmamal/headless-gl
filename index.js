@@ -1,6 +1,11 @@
+import { createContext as createContextNode } from './src/javascript/node-index.js';
+import { createContext as createContextBrowser } from './src/javascript/browser-index.js';
+export { WebGLRenderingContext } from './src/javascript/webgl-rendering-context.js';
+
+export let createContext
+
 if (typeof WebGLRenderingContext !== 'undefined') {
-  module.exports = require('./src/javascript/browser-index')
+  createContext = createContextBrowser;
 } else {
-  module.exports = require('./src/javascript/node-index')
+  createContext = createContextNode;
 }
-module.exports.WebGLRenderingContext = require('./src/javascript/webgl-rendering-context').WebGLRenderingContext

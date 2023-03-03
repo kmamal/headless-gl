@@ -75,7 +75,7 @@ const privateMethods = [
   'destroy'
 ]
 
-function wrapContext (ctx) {
+export function wrapContext (ctx) {
   const wrapper = new WebGLRenderingContext()
   bindPublics(Object.keys(ctx), wrapper, ctx, privateMethods)
   bindPublics(Object.keys(ctx.constructor.prototype), wrapper, ctx, privateMethods)
@@ -97,7 +97,7 @@ function wrapContext (ctx) {
 }
 
 // We need to wrap some of the native WebGL functions to handle certain error codes and check input values
-class WebGLRenderingContext extends NativeWebGLRenderingContext {
+export class WebGLRenderingContext extends NativeWebGLRenderingContext {
   _checkDimensions (
     target,
     width,
@@ -3872,5 +3872,3 @@ for (const [key, value] of Object.entries(gl)) {
   }
   Object.assign(WebGLRenderingContext, { [key]: value })
 }
-
-module.exports = { WebGLRenderingContext, wrapContext }

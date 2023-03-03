@@ -1,4 +1,4 @@
-function createContext (width, height, options) {
+export function createContext (width, height, options) {
   width = width | 0
   height = height | 0
   if (!(width > 0 && height > 0)) {
@@ -65,5 +65,3 @@ function createContext (width, height, options) {
 
   return gl || null
 }
-
-module.exports = createContext
