@@ -1,16 +1,19 @@
 /* globals __line */
-const path = require('path')
-const createContext = require('../../index')
-const utils = require('../common/utils.js')
-const utilsLog = require('../common/utils_log.js')
-const log = new utilsLog.Log(path.basename(__filename), 'DEBUG')
-const bunny = require('bunny')
-const normals = require('angle-normals')
+import { basename } from 'path'
+import { createContext } from '../../index.js'
+import { createProgramFromSources, bufferToFile } from '../common/utils.js'
+import { Log } from '../common/utils_log.js'
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const log = new Log(basename(__filename), 'DEBUG')
+import { positions, cells } from 'bunny'
+import normals from 'angle-normals'
 
 // flatten a multi-dimensional array.
 // so [[1,2,3], [2,3,4],...] becomes
 // [1,2,3, 2,3,4]
-function flatten (data) {
+function flatten(data) {
   const result = []
   const dimension = data[0].length
   let ptr = 0
@@ -23,7 +26,7 @@ function flatten (data) {
   return result
 }
 
-function main () {
+function main() {
   // Create context
   const width = 512
   const height = 512
@@ -64,7 +67,7 @@ function main () {
   `
 
   // setup a GLSL program
-  const program = utils.createProgramFromSources(gl, [vertexSrc, fragmentSrc])
+  const program = createProgramFromSources(gl, [vertexSrc, fragmentSrc])
   gl.useProgram(program)
 
   // look up where the vertex data needs to go.
@@ -85,25 +88,25 @@ function main () {
 
   const positionBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(bunny.positions)), gl.STATIC_DRAW)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(positions)), gl.STATIC_DRAW)
   gl.enableVertexAttribArray(positionLocation)
   gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0)
 
   const normalBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(normals(bunny.cells, bunny.positions))), gl.STATIC_DRAW)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(normals(cells, positions))), gl.STATIC_DRAW)
   gl.enableVertexAttribArray(normalLocation)
   gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 0, 0)
 
   const elementsBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementsBuffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flatten(bunny.cells)), gl.STATIC_DRAW)
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flatten(cells)), gl.STATIC_DRAW)
 
-  gl.drawElements(gl.TRIANGLES, bunny.cells.length * 3, gl.UNSIGNED_SHORT, 0)
+  gl.drawElements(gl.TRIANGLES, cells.length * 3, gl.UNSIGNED_SHORT, 0)
 
-  var filename = __filename + '.ppm' // eslint-disable-line
+  let filename = __filename + '.ppm' // eslint-disable-line
   log.info(__line, 'rendering ' + filename)
-  utils.bufferToFile(gl, width, height, filename)
+  bufferToFile(gl, width, height, filename)
   log.info(__line, 'finished rendering ' + filename)
 
   gl.destroy()
@@ -111,7 +114,7 @@ function main () {
 
 // Taken from gl-mat4
 // https://github.com/stackgl/gl-mat4/blob/master/lookAt.js
-function lookAt (eye, center, up) {
+function lookAt(eye, center, up) {
   let x0, x1, x2, y0, y1, y2, z0, z1, z2, len
   const eyex = eye[0]
   const eyey = eye[1]
@@ -173,7 +176,7 @@ function lookAt (eye, center, up) {
 
 // Taken from gl-mat4
 // https://github.com/stackgl/gl-mat4/blob/master/perspective.js
-function perspective (fovy, aspect, near, far) {
+function perspective(fovy, aspect, near, far) {
   const f = 1.0 / Math.tan(fovy / 2)
   const nf = 1 / (near - far)
 

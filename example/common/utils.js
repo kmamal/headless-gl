@@ -1,6 +1,6 @@
-const fs = require('fs')
+import fs from "fs"
 
-function bufferToStdout (gl, width, height) {
+export function bufferToStdout(gl, width, height) {
   // Write output
   const pixels = new Uint8Array(width * height * 4)
   gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
@@ -10,7 +10,7 @@ function bufferToStdout (gl, width, height) {
   }
 }
 
-function bufferToFile (gl, width, height, filename) {
+export function bufferToFile(gl, width, height, filename) {
   const file = fs.createWriteStream(filename)
 
   // Write output
@@ -22,7 +22,7 @@ function bufferToFile (gl, width, height, filename) {
   }
 }
 
-function drawTriangle (gl) {
+export function drawTriangle(gl) {
   const buffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-2, -2, -2, 4, 4, -2]), gl.STREAM_DRAW)
@@ -34,7 +34,7 @@ function drawTriangle (gl) {
   gl.deleteBuffer(buffer)
 }
 
-function loadShader (gl, shaderSource, shaderType) {
+export function loadShader(gl, shaderSource, shaderType) {
   const shader = gl.createShader(shaderType)
   gl.shaderSource(shader, shaderSource)
   gl.compileShader(shader)
@@ -52,7 +52,7 @@ function loadShader (gl, shaderSource, shaderType) {
   return shader
 }
 
-function createProgram (gl, shaders, optAttribs, optLocations) {
+export function createProgram(gl, shaders, optAttribs, optLocations) {
   const program = gl.createProgram()
   shaders.forEach(function (shader) {
     gl.attachShader(program, shader)
@@ -80,7 +80,7 @@ function createProgram (gl, shaders, optAttribs, optLocations) {
   return program
 }
 
-function createProgramFromSources (gl, shaderSources, optAttribs, optLocations) {
+export function createProgramFromSources(gl, shaderSources, optAttribs, optLocations) {
   const defaultShaderType = [
     'VERTEX_SHADER',
     'FRAGMENT_SHADER'
@@ -92,10 +92,3 @@ function createProgramFromSources (gl, shaderSources, optAttribs, optLocations) 
   }
   return createProgram(gl, shaders, optAttribs, optLocations)
 }
-
-module.exports.bufferToStdout = bufferToStdout
-module.exports.bufferToFile = bufferToFile
-module.exports.drawTriangle = drawTriangle
-module.exports.loadShader = loadShader
-module.exports.createProgram = createProgram
-module.exports.createProgramFromSources = createProgramFromSources

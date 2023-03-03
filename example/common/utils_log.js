@@ -1,9 +1,8 @@
 /* globals  __stack */
-
-const log4js = require('log4js')
+import log4js from 'log4js'
 // var path = require('path')
 
-function getLogger (category, level) {
+function getLogger(category, level) {
   if (level == null) {
     level = 'INFO'
   }
@@ -25,25 +24,25 @@ function getLogger (category, level) {
   return log4js.getLogger(category)
 }
 
-function Log (filename, level) {
-  this.log = getLogger('', level)
-  this.filename = filename
-}
-
-Log.prototype = {
-  error: function (line, text) {
+export class Log {
+  constructor(filename, level) {
+    this.log = getLogger('', level)
+    this.filename = filename
+  }
+  error(line, text) {
     this.log.error('(' + this.filename + ':' + line + ') ' + text)
-  },
-  info: function (line, text) {
+  }
+  info(line, text) {
     this.log.info('(' + this.filename + ':' + line + ') ' + text)
-  },
-  warn: function (line, text) {
+  }
+  warn(line, text) {
     this.log.warn('(' + this.filename + ':' + line + ') ' + text)
-  },
-  debug: function (line, text) {
+  }
+  debug(line, text) {
     this.log.debug('(' + this.filename + ':' + line + ') ' + text)
   }
 }
+
 
 Object.defineProperty(global, '__stack', {
   get: function () {
@@ -52,7 +51,7 @@ Object.defineProperty(global, '__stack', {
       return stack
     }
     const err = new Error()
-    Error.captureStackTrace(err, arguments.callee) // eslint-disable-line 
+    Error.captureStackTrace(err, this.caller) // eslint-disable-line 
     const stack = err.stack
     Error.prepareStackTrace = orig
     return stack
@@ -64,5 +63,3 @@ Object.defineProperty(global, '__line', {
     return __stack[1].getLineNumber()
   }
 })
-
-module.exports.Log = Log
