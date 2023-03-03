@@ -1,7 +1,5 @@
-'use strict'
-
-const tape = require('tape')
-const WebGLRenderingContext = require('../index').WebGLRenderingContext
+import tape from 'tape'
+import { WebGLRenderingContext } from '../index.js'
 
 tape('use WebGLRenderingContext', function (t) {
   t.equals(!!WebGLRenderingContext, true)
