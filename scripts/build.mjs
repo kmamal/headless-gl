@@ -1,5 +1,5 @@
-import Fs from 'node:fs'
-import { execSync } from 'node:child_process'
+import * as Fs from 'fs'
+import { execSync } from 'child_process'
 import C from './util/common.js'
 
 await Promise.all([

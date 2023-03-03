@@ -1,4 +1,3 @@
-
 if (!process.env.GL_FROM_SOURCE) {
 	try {
 		await import('./download-release.mjs')
