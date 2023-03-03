@@ -1,9 +1,13 @@
 /* global __line */
-const path = require('path')
-const createContext = require('../../index')
-const utils = require('../common/utils.js')
-const utilsLog = require('../common/utils_log.js')
-const log = new utilsLog.Log(path.basename(__filename), 'DEBUG')
+import { basename } from 'path'
+import { createContext } from '../../index.js'
+import { createProgramFromSources, bufferToFile } from '../common/utils.js'
+import { fileURLToPath } from 'url';
+import { Log } from '../common/utils_log.js'
+
+const __filename = fileURLToPath(import.meta.url);
+const log = new Log(basename(__filename), 'DEBUG')
+
 
 function main () {
   // Create context
@@ -59,7 +63,7 @@ function main () {
   `
 
   // setup a GLSL program
-  const program = utils.createProgramFromSources(gl, [vertexSrc, fragmentSrc])
+  const program = createProgramFromSources(gl, [vertexSrc, fragmentSrc])
 
   if (!program) {
     return
@@ -91,7 +95,7 @@ function main () {
 
   var filename = __filename + '.ppm' // eslint-disable-line
   log.info(__line, 'rendering ' + filename)
-  utils.bufferToFile(gl, width, height, filename)
+  bufferToFile(gl, width, height, filename)
   log.info(__line, 'finished rendering ' + filename)
 
   gl.destroy()
