@@ -4,11 +4,11 @@ import { createContext } from '../../index.js'
 import { createProgramFromSources, bufferToFile } from '../common/utils.js'
 import { Log } from '../common/utils_log.js'
 import { fileURLToPath } from 'url';
+import { positions, cells } from 'bunny'
+import normals from 'angle-normals'
 
 const __filename = fileURLToPath(import.meta.url);
 const log = new Log(basename(__filename), 'DEBUG')
-import { positions, cells } from 'bunny'
-import normals from 'angle-normals'
 
 // flatten a multi-dimensional array.
 // so [[1,2,3], [2,3,4],...] becomes
