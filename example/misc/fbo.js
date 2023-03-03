@@ -1,12 +1,14 @@
 /* globals __line */
+import { basename } from 'path'
+import { createContext } from '../../index.js'
+import { bufferToFile } from '../common/utils.js'
+import { Log } from '../common/utils_log.js'
+import { fileURLToPath } from 'url';
 
-const path = require('path')
-const createContext = require('../../index')
-const utils = require('../common/utils.js')
-const utilsLog = require('../common/utils_log.js')
-const log = new utilsLog.Log(path.basename(__filename), 'DEBUG')
+const __filename = fileURLToPath(import.meta.url);
+const log = new Log(basename(__filename), 'DEBUG')
 
-function main () {
+function main() {
   // Create context
   const width = 512
   const height = 512
@@ -19,7 +21,7 @@ function main () {
 
   var filename = __filename + '.ppm' // eslint-disable-line
   log.info(__line, 'rendering ' + filename)
-  utils.bufferToFile(gl, width, height, filename)
+  bufferToFile(gl, width, height, filename)
   log.info(__line, 'finished rendering ' + filename)
 
   gl.destroy()
