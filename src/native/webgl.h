@@ -95,8 +95,11 @@ struct WebGLRenderingContext : public node::ObjectWrap {
     bool premultipliedAlpha,
     bool preserveDrawingBuffer,
     bool preferLowPowerToHighPerformance,
-    bool failIfMajorPerformanceCaveat);
+    bool failIfMajorPerformanceCaveat,
+    EGLNativeWindowType* window);
   virtual ~WebGLRenderingContext();
+
+  bool swap();
 
   //Context validation
   static WebGLRenderingContext* ACTIVE;
@@ -127,6 +130,8 @@ struct WebGLRenderingContext : public node::ObjectWrap {
 
   static NAN_METHOD(New);
   static NAN_METHOD(Destroy);
+
+  static NAN_METHOD(Swap);
 
   static NAN_METHOD(VertexAttribDivisor);
   static NAN_METHOD(DrawArraysInstanced);

@@ -1,5 +1,6 @@
 example/*
 test/*
+.github
 .travis.yml
 appveyor.yml
 build/*

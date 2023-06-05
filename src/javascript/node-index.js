@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 const bits = require('bit-twiddle')
 const { WebGLContextAttributes } = require('./webgl-context-attributes')
 const { WebGLRenderingContext, wrapContext } = require('./webgl-rendering-context')
@@ -34,6 +36,9 @@ function createContext (width, height, options) {
   contextAttributes.premultipliedAlpha =
     contextAttributes.premultipliedAlpha && contextAttributes.alpha
 
+  const window = options && options.window
+  const hasWindow = Boolean(window)
+
   let ctx
   try {
     ctx = new WebGLRenderingContext(
@@ -46,7 +51,8 @@ function createContext (width, height, options) {
       contextAttributes.premultipliedAlpha,
       contextAttributes.preserveDrawingBuffer,
       contextAttributes.preferLowPowerToHighPerformance,
-      contextAttributes.failIfMajorPerformanceCaveat)
+      contextAttributes.failIfMajorPerformanceCaveat,
+      window)
   } catch (e) {}
   if (!ctx) {
     return null
@@ -102,7 +108,7 @@ function createContext (width, height, options) {
   ctx._packAlignment = 4
 
   // Allocate framebuffer
-  ctx._allocateDrawingBuffer(width, height)
+  ctx._allocateDrawingBuffer(width, height, hasWindow)
 
   const attrib0Buffer = ctx.createBuffer()
   ctx._attrib0Buffer = attrib0Buffer
@@ -123,7 +129,7 @@ function createContext (width, height, options) {
   ctx.clearStencil(0)
   ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT | ctx.STENCIL_BUFFER_BIT)
 
-  return wrapContext(ctx)
+  return hasWindow ? ctx : wrapContext(ctx)
 }
 
 module.exports = createContext
