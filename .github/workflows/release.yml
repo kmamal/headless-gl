@@ -28,7 +28,7 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - if: ${{ startsWith(matrix.platform.os, 'ubuntu-') }}
-        run: npm run install-deps-ubuntu
+        run: ./scripts/install-deps-ubuntu.sh
 
       - run: npm run release
         env:
