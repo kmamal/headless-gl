@@ -3,6 +3,13 @@
   "version": "8.0.2-0",
   "description": "Fork of `gl` that can render to windows",
   "main": "index.js",
+  "types": "./src/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types/index.d.ts",
+      "default": "./src/javascript/index.js"
+    }
+  },
   "directories": {
     "test": "test"
   },
