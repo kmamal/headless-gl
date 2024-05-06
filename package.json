@@ -1,8 +1,15 @@
 {
   "name": "@kmamal/gl",
-  "version": "8.0.2-0",
+  "version": "8.0.2-2",
   "description": "Fork of `gl` that can render to windows",
-  "main": "index.js",
+  "main": "./index.js",
+  "types": "./src/types/index.d.ts",
+  "exports": {
+    ".": {
+      "default": "./index.js",
+      "types": "./src/types/index.d.ts"
+    }
+  },
   "directories": {
     "test": "test"
   },
