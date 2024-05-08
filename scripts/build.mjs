@@ -11,6 +11,17 @@ await Promise.all([
 	await Fs.promises.rm(dir, { recursive: true }).catch(() => {})
 }))
 
+console.log("applying patch")
+
+try {
+	execSync(`git apply ${Path.join(C.dir.root, 'angle.patch')}`, {
+		stdio: 'inherit',
+		cwd: Path.join(C.dir.root, 'angle'),
+	})
+} catch (_) {
+	console.log("maybe the patch was already applied?")
+}
+
 console.log("build in", C.dir.build)
 
 let archFlag = ''

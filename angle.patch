@@ -1,0 +1,34 @@
+diff --git a/src/libANGLE/renderer/gl/cgl/WindowSurfaceCGL.mm b/src/libANGLE/renderer/gl/cgl/WindowSurfaceCGL.mm
+index db96e402..55843fff 100644
+--- a/src/libANGLE/renderer/gl/cgl/WindowSurfaceCGL.mm
++++ b/src/libANGLE/renderer/gl/cgl/WindowSurfaceCGL.mm
+@@ -48,8 +48,14 @@
+             mSwapState  = swapState;
+             mFunctions  = functions;
+ 
++            [CATransaction begin];
++            [CATransaction setValue:(id)kCFBooleanTrue
++                            forKey:kCATransactionDisableActions];
++
+             [self setFrame:CGRectMake(0, 0, mSwapState->textures[0].width,
+                                       mSwapState->textures[0].height)];
++
++            [CATransaction commit];
+         }
+         return self;
+     }
+@@ -111,8 +117,14 @@
+         const auto &texture = *mSwapState->beingPresented;
+         if ([self frame].size.width != texture.width || [self frame].size.height != texture.height)
+         {
++            [CATransaction begin];
++            [CATransaction setValue:(id)kCFBooleanTrue
++                            forKey:kCATransactionDisableActions];
++
+             [self setFrame:CGRectMake(0, 0, texture.width, texture.height)];
+ 
++            [CATransaction commit];
++
+             // Without this, the OSX compositor / window system doesn't see the resize.
+             [self setNeedsDisplay];
+         }

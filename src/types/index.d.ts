@@ -532,6 +532,7 @@ export interface WebGLRenderingContextBase {
 	vertexAttribPointer(index: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, offset: GLintptr): undefined;
 	viewport(x: GLint, y: GLint, width: GLsizei, height: GLsizei): undefined;
 
+	getExtension(name: 'STACKGL_resize_drawingbuffer'): STACKGL_resize_drawingbuffer | null;
 	getExtension(name: 'ANGLE_instanced_arrays '): ANGLE_instanced_arrays | null;
 	getExtension(name: 'OES_element_index_uint'): {} | null;
 	getExtension(name: 'OES_texture_float'): OES_texture_float | null;
@@ -545,6 +546,9 @@ export interface WebGLRenderingContextBase {
 	swap(): undefined;
 }
 
+export interface STACKGL_resize_drawingbuffer {
+	resize(width: GLint, height: GLint): undefined;
+}
 export interface ANGLE_instanced_arrays {}
 export interface OES_texture_float {}
 export interface OES_vertex_array_object {}
