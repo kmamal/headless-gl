@@ -835,6 +835,19 @@ class WebGLRenderingContext extends NativeWebGLRenderingContext {
   }
 
   _wrapShader (type, source) { // eslint-disable-line
+    // the #version directive must appear first in the shader source
+    // before adding extra directives, we extract the #version so we can prepend it again later
+    const lines = source.split('\n')
+    let versionDirective = null
+    for (let i = 0; i < lines.length; i++) {
+      if (/^[ \t]*#version/.test(lines[i])) {
+        versionDirective = lines[i]
+        lines.splice(i, 1)
+        source = lines.join('\n')
+        break
+      }
+    }
+
     // the gl implementation seems to define `GL_OES_standard_derivatives` even when the extension is disabled
     // this behaviour causes one conformance test ('GL_OES_standard_derivatives defined in shaders when extension is disabled') to fail
     // by `undef`ing `GL_OES_standard_derivatives`, this appears to solve the issue
@@ -842,7 +855,16 @@ class WebGLRenderingContext extends NativeWebGLRenderingContext {
       source = '#undef GL_OES_standard_derivatives\n' + source
     }
 
-    return this._extensions.webgl_draw_buffers ? source : '#define gl_MaxDrawBuffers 1\n' + source // eslint-disable-line
+    if (!this._extensions.webgl_draw_buffers) {
+      source = '#define gl_MaxDrawBuffers 1\n' + source
+    }
+
+    // move the #version directive back to the top
+    if (versionDirective !== null) {
+      source = versionDirective + '\n' + source
+    }
+
+    return source
   }
 
   _beginAttrib0Hack () {
