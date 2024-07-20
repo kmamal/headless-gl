@@ -844,12 +844,13 @@ class WebGLRenderingContext extends NativeWebGLRenderingContext {
     const lines = (this._extensions.webgl_draw_buffers ? source : '#define gl_MaxDrawBuffers 1\n' + source).split('\n')
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+      if (lines[i].substring(0, 8) === '#version') {
+        const line = lines[i]
 
-      if (line.substring(0, 8) === '#version') {
         lines.splice(i, 1)
-
         lines.unshift(line)
+
+        break
       }
     }
 
