@@ -840,7 +840,20 @@ class WebGLRenderingContext extends NativeWebGLRenderingContext {
       source = '#undef GL_OES_standard_derivatives\n' + source
     }
 
-    return this._extensions.webgl_draw_buffers ? source : '#define gl_MaxDrawBuffers 1\n' + source // eslint-disable-line
+    // move the #version syntax to the start
+    const lines = (this._extensions.webgl_draw_buffers ? source : '#define gl_MaxDrawBuffers 1\n' + source).split('\n')
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+
+      if (line.substring(0, 8) === '#version') {
+        lines.splice(i, 1)
+
+        lines.unshift(line)
+      }
+    }
+
+    return lines.join('\n') // eslint-disable-line
   }
 
   _beginAttrib0Hack () {
