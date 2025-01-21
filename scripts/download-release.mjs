@@ -9,9 +9,9 @@ const url = `https://github.com/${C.owner}/${C.repo}/releases/download/v${C.vers
 console.log("fetch", url)
 const response = await fetch(url)
 
-console.log("unpack to", C.dir.release)
+console.log("unpack to", C.dir.dist)
 await Fs.promises.rm(C.dir.build, { recursive: true }).catch(() => {})
-await Fs.promises.mkdir(C.dir.release, { recursive: true })
-const tar = Tar.extract({ gzip: true, C: C.dir.release })
+await Fs.promises.mkdir(C.dir.dist, { recursive: true })
+const tar = Tar.extract({ gzip: true, C: C.dir.dist })
 response.stream().pipe(tar)
 await once(tar, 'finish')
