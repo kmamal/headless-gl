@@ -1,4 +1,4 @@
-const NativeWebGL = require('bindings')('webgl')
+const NativeWebGL = require('../../dist/webgl.node')
 const { WebGLRenderingContext: NativeWebGLRenderingContext } = NativeWebGL
 process.on('exit', NativeWebGL.cleanup)
 

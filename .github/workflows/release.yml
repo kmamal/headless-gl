@@ -14,10 +14,10 @@ jobs:
       matrix:
         platform:
           - { name: 'Linux (x64)'   ,os: ubuntu-22.04              }
-          # - { name: 'Windows (x64)' ,os: windows-2022              }
-          # - { name: 'Mac (x64)'     ,os: macos-13                  }
-          # - { name: 'Mac (arm64)'   ,os: macos-13     ,arch: arm64 }
-        node: [ 18, 19, 20, 22 ]
+          - { name: 'Windows (x64)' ,os: windows-2022              }
+          - { name: 'Mac (x64)'     ,os: macos-13                  }
+          - { name: 'Mac (arm64)'   ,os: macos-13     ,arch: arm64 }
+        node: [ 18, 20, 22, 23 ]
 
     runs-on: ${{ matrix.platform.os }}
 

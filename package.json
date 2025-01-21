@@ -1,6 +1,6 @@
 {
   "name": "@kmamal/gl",
-  "version": "8.1.6-0",
+  "version": "8.1.6-1",
   "description": "Fork of `gl` that can render to windows",
   "main": "./index.js",
   "browser": "./src/javascript/browser-index.js",
@@ -27,7 +27,6 @@
     "clean": "cd scripts && node clean.mjs"
   },
   "dependencies": {
-    "bindings": "^1.5.0",
     "bit-twiddle": "^1.0.2",
     "glsl-tokenizer": "^2.1.5",
     "nan": "^2.22.0",

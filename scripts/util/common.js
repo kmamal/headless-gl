@@ -7,6 +7,7 @@ dir.build = Path.join(dir.root, 'build')
 dir.release = Path.join(dir.build, 'Release')
 dir.dist = Path.join(dir.root, 'dist')
 dir.publish = Path.join(dir.root, 'publish')
+dir.deps = Path.join(dir.root, 'deps')
 
 const pkgPath = Path.join(dir.root, 'package.json')
 const pkg = JSON.parse(Fs.readFileSync(pkgPath).toString())
