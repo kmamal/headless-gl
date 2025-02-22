@@ -33,11 +33,6 @@
     "node-gyp": "^10.2.0",
     "tar": "^6.1.15"
   },
-  "devDependencies": {
-    "angle-normals": "^1.0.0",
-    "bunny": "^1.0.1",
-    "gl-conformance": "^2.0.9"
-  },
   "repository": {
     "type": "git",
     "url": "git+ssh://github.com/kmamal/headless-gl.git"
