@@ -6,10 +6,6 @@ it can work together with [`@kmamal/sdl`](https://github.com/kmamal/node-sdl#rea
 It should work on Linux, Mac, and Windows.
 Prebuilt binaries are available for x64 architectures, and arm-based Macs.
 
-Releases of this package start from `v4.9.0` of `gl`.
-This package's version number tracks the `gl` package's version number and appends a suffix with it's own "release" version such as:
-`v4.9.0-2` where the `-2` suffix denotes that this is the second release of this package for the `v4.9.0` release of `gl`.
-
 ## Example
 
 ```js
