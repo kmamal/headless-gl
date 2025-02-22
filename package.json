@@ -30,8 +30,8 @@
     "glsl-tokenizer": "^2.1.5",
     "nan": "^2.22.0",
     "node-abi": "^3.71.0",
-    "node-gyp": "^10.2.0",
-    "tar": "^6.1.15"
+    "node-gyp": "^11.1.0",
+    "tar": "^7.4.3"
   },
   "repository": {
     "type": "git",
