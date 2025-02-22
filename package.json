@@ -1,6 +1,6 @@
 {
   "name": "@kmamal/gl",
-  "version": "5.0.0",
+  "version": "9.0.0",
   "description": "Fork of `gl` that can render to windows",
   "main": "./index.js",
   "browser": "./src/javascript/browser-index.js",
