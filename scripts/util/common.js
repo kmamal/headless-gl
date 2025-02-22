@@ -11,7 +11,7 @@ dir.deps = Path.join(dir.root, 'deps')
 
 const pkgPath = Path.join(dir.root, 'package.json')
 const pkg = JSON.parse(Fs.readFileSync(pkgPath).toString())
-const version = pkg.version.slice(0, pkg.version.indexOf('-'))
+const version = pkg.version
 const [ , owner, repo ] = pkg.repository.url.match(/([^/:]+)\/([^/]+).git$/u)
 
 const { platform, arch } = process
