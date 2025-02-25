@@ -13,10 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - { name: 'Linux (x64)'   ,os: ubuntu-22.04              }
-          - { name: 'Windows (x64)' ,os: windows-2022              }
-          - { name: 'Mac (x64)'     ,os: macos-14     ,arch: x64   }
-          - { name: 'Mac (arm64)'   ,os: macos-14     ,arch: arm64 }
+          # - { name: 'Linux (x64)'   ,os: ubuntu-22.04              }
+          - { name: 'Linux (arm64)'   ,os: ubuntu-22.04-arm        }
+          # - { name: 'Windows (x64)' ,os: windows-2022              }
+          # - { name: 'Mac (x64)'     ,os: macos-14     ,arch: x64   }
+          # - { name: 'Mac (arm64)'   ,os: macos-14     ,arch: arm64 }
         node: [ 18, 20, 22, 23 ]
 
     runs-on: ${{ matrix.platform.os }}
@@ -31,7 +32,7 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - if: ${{ startsWith(matrix.platform.os, 'ubuntu-') }}
-        run: ./scripts/install-deps-ubuntu.sh
+        run: sudo apt-get update && sudo ./scripts/install-deps-ubuntu.sh
 
       - run: npm run release
         env:

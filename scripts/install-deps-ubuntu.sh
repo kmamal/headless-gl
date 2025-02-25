@@ -1,6 +1,5 @@
 
-sudo apt update
-sudo apt install \
+apt-get install -y \
   build-essential \
   libgl1-mesa-dri \
   libglapi-mesa \
