@@ -36,7 +36,7 @@ function createContext (width, height, options) {
   contextAttributes.premultipliedAlpha =
     contextAttributes.premultipliedAlpha && contextAttributes.alpha
 
-  const window = options && options.window
+  const window = options && options.window.gl
   const hasWindow = Boolean(window)
 
   let ctx
