@@ -29,6 +29,11 @@ await Fs.promises.cp(
 	Path.join(C.dir.dist, 'webgl.node'),
 )
 
+// Strip binaries on linux
+if (C.platform === 'linux') {
+	execSync(`strip -s ${Path.join(C.dir.dist, 'webgl.node')}`)
+}
+
 // NOTE: Next release will probably include deps for all platforms
 if (C.platform === 'win32') {
 	const dllDir = Path.join(C.dir.deps, 'windows/dll/x64')
@@ -36,6 +41,7 @@ if (C.platform === 'win32') {
 		await Fs.promises.cp(
 			Path.join(dllDir, filename),
 			Path.join(C.dir.dist, filename),
+			{ verbatimSymlinks: true },
 		)
 	}
 }
