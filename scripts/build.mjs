@@ -29,6 +29,12 @@ await Fs.promises.cp(
 	Path.join(C.dir.dist, 'webgl.node'),
 )
 
+// Include the licenses (covers headless-gl and the bundled ANGLE)
+await Fs.promises.cp(
+	Path.join(C.dir.root, 'LICENSES'),
+	Path.join(C.dir.dist, 'LICENSES'),
+)
+
 // Strip binaries on linux
 if (C.platform === 'linux') {
 	execSync(`strip -s ${Path.join(C.dir.dist, 'webgl.node')}`)
