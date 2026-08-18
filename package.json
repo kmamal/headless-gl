@@ -26,12 +26,14 @@
     "clean": "cd scripts && node clean.mjs"
   },
   "dependencies": {
-    "bit-twiddle": "^1.0.2",
-    "glsl-tokenizer": "^2.1.5",
-    "nan": "^2.22.0",
-    "node-abi": "^3.71.0",
-    "node-gyp": "^11.1.0",
-    "tar": "^7.4.3"
+    "bit-twiddle": "1.0.2",
+    "glsl-tokenizer": "2.1.5",
+    "modern-tar": "0.8.4",
+    "node-abi": "3.71.0"
+  },
+  "devDependencies": {
+    "nan": "2.22.0",
+    "node-gyp": "11.1.0"
   },
   "repository": {
     "type": "git",
