@@ -6,6 +6,10 @@ it can work together with [`@kmamal/sdl`](https://github.com/kmamal/node-sdl#rea
 It should work on Linux, Mac, and Windows.
 Prebuilt binaries are available for x64 architectures, and arm-based Macs.
 
+On Linux, both X11 and Wayland windows are supported (matching `window.native.subsystem` from `@kmamal/sdl`).
+Wayland rendering goes through ANGLE's Vulkan backend, so it needs a working Vulkan driver.
+The Linux native-window payload is an ABI contract shared with `@kmamal/sdl`: versions of this package from 10 on require `@kmamal/sdl` >= 0.12, and older versions only work with older sdl.
+
 ## Example
 
 ```js

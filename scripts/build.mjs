@@ -2,6 +2,7 @@ import Fs from 'node:fs'
 import Path from 'node:path'
 import { execSync } from 'node:child_process'
 import C from './util/common.js'
+import { linkVulkanLoader } from './util/link-vulkan.mjs'
 
 await Promise.all([
 	C.dir.build,
@@ -49,3 +50,5 @@ for (const filename of await Fs.promises.readdir(C.dir.release)) {
 		{ verbatimSymlinks: true },
 	)
 }
+
+await linkVulkanLoader()

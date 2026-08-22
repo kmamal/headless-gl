@@ -46,6 +46,11 @@ getRelease: {
 const releaseId = (await response.json()).id
 
 console.log("create archive", C.assetName)
+
+// The libvulkan.so.1 symlink points into the build machine; install.mjs
+// re-creates it on the consumer's machine
+await Fs.promises.rm(Path.join(C.dir.dist, 'libvulkan.so.1'), { force: true })
+
 await Fs.promises.rm(C.dir.publish, { recursive: true }).catch(() => {})
 await Fs.promises.mkdir(C.dir.publish, { recursive: true })
 const assetPath = Path.join(C.dir.publish, C.assetName)

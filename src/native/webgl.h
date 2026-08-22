@@ -37,17 +37,30 @@ enum GLContextState {
 
 bool CaseInsensitiveCompare(const std::string &a, const std::string &b);
 
+#ifdef __linux__
+// Tagged native-window payload produced by @kmamal/sdl on Linux. The layout is
+// an ABI contract shared by @kmamal/sdl, @kmamal/gl, and @kmamal/gpu.
+struct LinuxNativeData {
+  uint64_t subsystem; // 1 = x11, 2 = wayland
+  void *display;      // Display*   | wl_display*
+  uintptr_t window;   // Window XID | wl_egl_window*
+};
+#endif
+
 using GLObjectReference = std::pair<GLuint, GLObjectType>;
 using WebGLToANGLEExtensionsMap =
     std::map<std::string, std::vector<std::string>, decltype(&CaseInsensitiveCompare)>;
 
 struct WebGLRenderingContext : public node::ObjectWrap {
 
-  // The underlying OpenGL context
-  static bool HAS_DISPLAY;
-  static EGLDisplay DISPLAY;
+  // The underlying EGL displays, initialized on first use. The nullptr key is
+  // the default display; a non-null key is the wl_display the entry was
+  // created from (Wayland objects are per-connection, so each connection
+  // needs its own EGLDisplay).
+  static std::map<void *, EGLDisplay> DISPLAY_CACHE;
 
   SharedLibrary eglLibrary;
+  EGLDisplay display;
   EGLContext context;
   EGLConfig config;
   EGLSurface surface;
@@ -98,7 +111,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   WebGLRenderingContext(int width, int height, bool alpha, bool depth, bool stencil, bool antialias,
                         bool premultipliedAlpha, bool preserveDrawingBuffer,
                         bool preferLowPowerToHighPerformance, bool failIfMajorPerformanceCaveat,
-                        bool createWebGL2Context, EGLNativeWindowType *window);
+                        bool createWebGL2Context, void *windowHandle);
   virtual ~WebGLRenderingContext();
 
   bool swap();

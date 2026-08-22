@@ -171,8 +171,7 @@ static void MaybeEndRenderDocCapture() {
 #define RENDERDOC_COUNTER()
 #endif
 
-bool WebGLRenderingContext::HAS_DISPLAY = false;
-EGLDisplay WebGLRenderingContext::DISPLAY;
+std::map<void *, EGLDisplay> WebGLRenderingContext::DISPLAY_CACHE;
 WebGLRenderingContext *WebGLRenderingContext::ACTIVE = NULL;
 WebGLRenderingContext *WebGLRenderingContext::CONTEXT_LIST_HEAD = NULL;
 
@@ -214,7 +213,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                                              bool preserveDrawingBuffer,
                                              bool preferLowPowerToHighPerformance,
                                              bool failIfMajorPerformanceCaveat,
-                                             bool createWebGL2Context, EGLNativeWindowType *window)
+                                             bool createWebGL2Context, void *windowHandle)
     : state(GLCONTEXT_STATE_INIT), unpack_flip_y(false), unpack_premultiply_alpha(false),
       unpack_colorspace_conversion(0x9244), unpack_alignment(4),
       webGLToANGLEExtensions(&CaseInsensitiveCompare), next(NULL), prev(NULL) {
@@ -247,30 +246,62 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
     ::LoadEGL(getProcAddress);
   }
 
+  // Unpack the native window payload
+  bool hasWindow = windowHandle != nullptr;
+  EGLNativeWindowType window = 0;
+  void *nativeDisplay = nullptr; // key into DISPLAY_CACHE, nullptr = default
+#ifdef __linux__
+  if (hasWindow) {
+    LinuxNativeData *native = static_cast<LinuxNativeData *>(windowHandle);
+    window = (EGLNativeWindowType)native->window;
+    if (native->subsystem == 2) {
+      nativeDisplay = native->display;
+    }
+    // X11 windows go through the default display: XIDs are global, and the
+    // prebuilt ANGLE does not expose EGL_EXT_platform_x11
+  }
+#else
+  if (hasWindow) {
+    window = *static_cast<EGLNativeWindowType *>(windowHandle);
+  }
+#endif
+
   // Get display
-  if (!HAS_DISPLAY) {
-    DISPLAY = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (DISPLAY == EGL_NO_DISPLAY) {
-      errorMessage = "Error retrieving EGL default display.";
+  auto cachedDisplay = DISPLAY_CACHE.find(nativeDisplay);
+  if (cachedDisplay != DISPLAY_CACHE.end()) {
+    display = cachedDisplay->second;
+  } else {
+    if (nativeDisplay) {
+      // ANGLE only serves Wayland from its Vulkan backend, and picks it only
+      // when asked for explicitly
+      EGLAttrib displayAttribs[] = {EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+                                    EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE, EGL_NONE};
+      display = eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_EXT, nativeDisplay, displayAttribs);
+    } else {
+      display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    }
+    if (display == EGL_NO_DISPLAY) {
+      errorMessage = "Error retrieving EGL display.";
       state = GLCONTEXT_STATE_ERROR;
       return;
     }
 
     // Initialize EGL
-    if (!eglInitialize(DISPLAY, NULL, NULL)) {
+    if (!eglInitialize(display, NULL, NULL)) {
       errorMessage = "Error initializing EGL.";
       state = GLCONTEXT_STATE_ERROR;
       return;
     }
 
     // Save display
-    HAS_DISPLAY = true;
+    DISPLAY_CACHE[nativeDisplay] = display;
   }
 
   // Set up configuration
   EGLint renderableTypeBit = createWebGL2Context ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_ES3_BIT;
+  EGLint surfaceTypeBit = hasWindow ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT;
   EGLint attrib_list[] = {EGL_SURFACE_TYPE,
-                          EGL_PBUFFER_BIT,
+                          surfaceTypeBit,
                           EGL_RED_SIZE,
                           8,
                           EGL_GREEN_SIZE,
@@ -287,7 +318,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                           renderableTypeBit,
                           EGL_NONE};
   EGLint num_config;
-  if (!eglChooseConfig(DISPLAY, attrib_list, &config, 1, &num_config) || num_config != 1) {
+  if (!eglChooseConfig(display, attrib_list, &config, 1, &num_config) || num_config != 1) {
     errorMessage = "Error choosing EGL config.";
     state = GLCONTEXT_STATE_ERROR;
     return;
@@ -303,26 +334,28 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                              EGL_ROBUST_RESOURCE_INITIALIZATION_ANGLE,
                              EGL_TRUE,
                              EGL_NONE};
-  context = eglCreateContext(DISPLAY, config, EGL_NO_CONTEXT, contextAttribs);
+  context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
   if (context == EGL_NO_CONTEXT) {
     state = GLCONTEXT_STATE_ERROR;
     return;
   }
 
-  if (window) {
-    surface = eglCreateWindowSurface(DISPLAY, config, *window, nullptr);
+  if (hasWindow) {
+    surface = eglCreateWindowSurface(display, config, window, nullptr);
   } else {
     EGLint surfaceAttribs[] = {EGL_WIDTH, (EGLint)width, EGL_HEIGHT, (EGLint)height, EGL_NONE};
-    surface = eglCreatePbufferSurface(DISPLAY, config, surfaceAttribs);
+    surface = eglCreatePbufferSurface(display, config, surfaceAttribs);
   }
   if (surface == EGL_NO_SURFACE) {
-    errorMessage = "Error creating EGL surface.";
+    std::ostringstream ss;
+    ss << "Error creating EGL surface. (0x" << std::hex << eglGetError() << ")";
+    errorMessage = ss.str();
     state = GLCONTEXT_STATE_ERROR;
     return;
   }
 
   // Set active
-  if (!eglMakeCurrent(DISPLAY, surface, surface, context)) {
+  if (!eglMakeCurrent(display, surface, surface, context)) {
     errorMessage = "Error making context current.";
     state = GLCONTEXT_STATE_ERROR;
     return;
@@ -403,7 +436,7 @@ bool WebGLRenderingContext::swap() {
   if (state != GLCONTEXT_STATE_OK) {
     return false;
   }
-  if (!eglSwapBuffers(DISPLAY, surface)) {
+  if (!eglSwapBuffers(display, surface)) {
     state = GLCONTEXT_STATE_ERROR;
     return false;
   }
@@ -417,7 +450,7 @@ bool WebGLRenderingContext::setActive() {
   if (this == ACTIVE) {
     return true;
   }
-  if (!eglMakeCurrent(DISPLAY, surface, surface, context)) {
+  if (!eglMakeCurrent(display, surface, surface, context)) {
     state = GLCONTEXT_STATE_ERROR;
     return false;
   }
@@ -486,12 +519,12 @@ void WebGLRenderingContext::dispose() {
   }
 
   // Deactivate context
-  eglMakeCurrent(DISPLAY, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
   ACTIVE = NULL;
 
   // Destroy surface and context
-  eglDestroySurface(DISPLAY, surface);
-  eglDestroyContext(DISPLAY, context);
+  eglDestroySurface(display, surface);
+  eglDestroyContext(display, context);
 }
 
 WebGLRenderingContext::~WebGLRenderingContext() { dispose(); }
@@ -508,10 +541,10 @@ GL_METHOD(DisposeAll) {
     CONTEXT_LIST_HEAD->dispose();
   }
 
-  if (WebGLRenderingContext::HAS_DISPLAY) {
-    eglTerminate(WebGLRenderingContext::DISPLAY);
-    WebGLRenderingContext::HAS_DISPLAY = false;
+  for (auto &entry : WebGLRenderingContext::DISPLAY_CACHE) {
+    eglTerminate(entry.second);
   }
+  WebGLRenderingContext::DISPLAY_CACHE.clear();
 }
 
 GL_METHOD(New) {
@@ -519,9 +552,9 @@ GL_METHOD(New) {
 
   bool createWebGL2Context = Nan::To<bool>(info[10]).ToChecked();
 
-  EGLNativeWindowType *window = info[11]->IsUndefined()
-                                    ? nullptr
-                                    : *Nan::TypedArrayContents<EGLNativeWindowType>(info[11]);
+  void *windowHandle = info[11]->IsUndefined()
+                           ? nullptr
+                           : static_cast<void *>(*Nan::TypedArrayContents<char>(info[11]));
 
   WebGLRenderingContext *instance =
       new WebGLRenderingContext(Nan::To<int32_t>(info[0]).ToChecked(), // Width
@@ -534,7 +567,7 @@ GL_METHOD(New) {
                                 Nan::To<bool>(info[7]).ToChecked(),    // preserve drawing buffer
                                 Nan::To<bool>(info[8]).ToChecked(),    // low power
                                 Nan::To<bool>(info[9]).ToChecked(),    // fail if crap
-                                createWebGL2Context, window);
+                                createWebGL2Context, windowHandle);
 
   if (instance->state != GLCONTEXT_STATE_OK) {
     if (!instance->errorMessage.empty()) {
