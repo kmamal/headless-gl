@@ -26,6 +26,7 @@ export interface WebGLContextAttributes {
 	powerPreference?: WebGLPowerPreference;
 	failIfMajorPerformanceCaveat?: boolean;
 	desynchronized?: boolean;
+	createWebGL2Context?: boolean;
 	window?: any;
 }
 

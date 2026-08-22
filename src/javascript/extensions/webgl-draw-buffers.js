@@ -52,7 +52,7 @@ class WebGLDrawBuffers {
       this._buffersState = buffers
       ctx.drawBuffersWEBGL([this.COLOR_ATTACHMENT0_WEBGL])
       return
-    } else if (!ctx._activeFramebuffer) {
+    } else if (!ctx._activeFramebuffers.draw) {
       if (buffers.length > 1) {
         ctx.setError(gl.INVALID_OPERATION)
         return

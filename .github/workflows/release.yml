@@ -18,14 +18,12 @@ jobs:
           - { name: 'Windows (x64)' ,os: windows-2022              }
           - { name: 'Mac (x64)'     ,os: macos-14     ,arch: x64   }
           - { name: 'Mac (arm64)'   ,os: macos-14     ,arch: arm64 }
-        node: [ 20, 22, 24 ]
+        node: [ 22, 24, 26 ]
 
     runs-on: ${{ matrix.platform.os }}
 
     steps:
       - uses: actions/checkout@v5
-        with:
-          submodules: true
 
       - uses: actions/setup-node@v4
         with:

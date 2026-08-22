@@ -40,14 +40,12 @@ if (C.platform === 'linux') {
 	execSync(`strip -s ${Path.join(C.dir.dist, 'webgl.node')}`)
 }
 
-// NOTE: Next release will probably include deps for all platforms
-if (C.platform === 'win32') {
-	const dllDir = Path.join(C.dir.deps, 'windows/dll/x64')
-	for await (const filename of await Fs.promises.readdir(dllDir)) {
-		await Fs.promises.cp(
-			Path.join(dllDir, filename),
-			Path.join(C.dir.dist, filename),
-			{ verbatimSymlinks: true },
-		)
-	}
+// Include the prebuilt ANGLE libraries (copied next to the addon by binding.gyp)
+for (const filename of await Fs.promises.readdir(C.dir.release)) {
+	if (!/\.(so|dylib|dll)$/u.test(filename)) { continue }
+	await Fs.promises.cp(
+		Path.join(C.dir.release, filename),
+		Path.join(C.dir.dist, filename),
+		{ verbatimSymlinks: true },
+	)
 }

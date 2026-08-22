@@ -16,23 +16,20 @@
       'sources': [
           'src/native/bindings.cc',
           'src/native/webgl.cc',
-          'src/native/procs.cc'
+          'src/native/SharedLibrary.cc',
+          'src/native/angle-loader/egl_loader.cc',
+          'src/native/angle-loader/gles_loader.cc'
       ],
       'include_dirs': [
         "<!(node -e \"require('nan')\")",
         '<(module_root_dir)/deps/include',
-        "angle/include"
+        "src/native/angle-includes"
       ],
       'library_dirs': [
         '<(module_root_dir)/deps/<(platform)'
       ],
       'conditions': [
         ['OS=="mac"', {
-            'dependencies':
-            [
-              'angle/src/angle.gyp:libEGL',
-              'angle/src/angle.gyp:libGLESv2'
-            ],
             'libraries': [
                 '-framework QuartzCore',
                 '-framework Quartz'
@@ -45,25 +42,43 @@
               'CLANG_CXX_LANGUAGE_STANDARD':'c++20',
               'GCC_VERSION': 'com.apple.compilers.llvm.clang.1_0'
             },
+            "copies": [
+              {
+                'destination': '<(PRODUCT_DIR)',
+                'files': [
+                  '<(module_root_dir)/deps/darwin/dylib/libEGL.dylib',
+                  '<(module_root_dir)/deps/darwin/dylib/libGLESv2.dylib',
+                ]
+              }
+           ]
         }],
-        ['OS=="linux"', {
-            'dependencies':
-            [
-              'angle/src/angle.gyp:libEGL',
-              'angle/src/angle.gyp:libGLESv2'
-            ]
+        ['OS=="linux" and target_arch=="arm64"', {
+            "copies": [
+              {
+                'destination': '<(PRODUCT_DIR)',
+                'files': [
+                  '<(module_root_dir)/deps/linux-arm64/so/libEGL.so',
+                  '<(module_root_dir)/deps/linux-arm64/so/libGLESv2.so',
+                ]
+              }
+           ]
+        }],
+        ['OS=="linux" and target_arch=="x64"', {
+            "copies": [
+              {
+                'destination': '<(PRODUCT_DIR)',
+                'files': [
+                  '<(module_root_dir)/deps/linux/so/libEGL.so',
+                  '<(module_root_dir)/deps/linux/so/libGLESv2.so',
+                ]
+              }
+           ]
         }],
         ['OS=="win"', {
-            'library_dirs': [
-              '<(module_root_dir)/deps/windows/lib/<(target_arch)',
-            ],
-            'libraries': [
-              'libEGL.lib',
-              'libGLESv2.lib'
-            ],
             'defines' : [
               'WIN32_LEAN_AND_MEAN',
-              'VC_EXTRALEAN'
+              'VC_EXTRALEAN',
+              'NOMINMAX',
             ],
             'configurations': {
               'Release': {
@@ -102,11 +117,11 @@
             },
             "copies": [
               {
-                'destination': '$(SolutionDir)$(ConfigurationName)',
+                'destination': '<(PRODUCT_DIR)',
                 'files': [
-                  '<(module_root_dir)/deps/windows/dll/<(target_arch)/libEGL.dll',
-                  '<(module_root_dir)/deps/windows/dll/<(target_arch)/libGLESv2.dll',
-                  '<(module_root_dir)/deps/windows/dll/<(target_arch)/d3dcompiler_47.dll'
+                  '<(module_root_dir)/deps/windows/dll/libEGL.dll',
+                  '<(module_root_dir)/deps/windows/dll/libGLESv2.dll',
+                  '<(module_root_dir)/deps/windows/dll/d3dcompiler_47.dll'
                 ]
               }
            ]

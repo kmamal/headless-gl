@@ -1,8 +1,6 @@
-/* eslint-disable */
-
 const bits = require('bit-twiddle')
 const { WebGLContextAttributes } = require('./webgl-context-attributes')
-const { WebGLRenderingContext, wrapContext } = require('./webgl-rendering-context')
+const { WebGLRenderingContext, WebGL2RenderingContext, wrapContext } = require('./webgl-rendering-context')
 const { WebGLTextureUnit } = require('./webgl-texture-unit')
 const { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } = require('./webgl-vertex-attribute')
 
@@ -30,18 +28,20 @@ function createContext (width, height, options) {
     flag(options, 'premultipliedAlpha', true),
     flag(options, 'preserveDrawingBuffer', false),
     flag(options, 'preferLowPowerToHighPerformance', false),
-    flag(options, 'failIfMajorPerformanceCaveat', false))
+    flag(options, 'failIfMajorPerformanceCaveat', false),
+    flag(options, 'createWebGL2Context', false))
 
   // Can only use premultipliedAlpha if alpha is set
   contextAttributes.premultipliedAlpha =
     contextAttributes.premultipliedAlpha && contextAttributes.alpha
 
-  const window = options && options.window.gl
+  const window = options && options.window && options.window.gl
   const hasWindow = Boolean(window)
 
+  const WebGLContext = contextAttributes.createWebGL2Context ? WebGL2RenderingContext : WebGLRenderingContext
   let ctx
   try {
-    ctx = new WebGLRenderingContext(
+    ctx = new WebGLContext(
       1,
       1,
       contextAttributes.alpha,
@@ -52,6 +52,7 @@ function createContext (width, height, options) {
       contextAttributes.preserveDrawingBuffer,
       contextAttributes.preferLowPowerToHighPerformance,
       contextAttributes.failIfMajorPerformanceCaveat,
+      contextAttributes.createWebGL2Context,
       window)
   } catch (e) {}
   if (!ctx) {
@@ -74,16 +75,21 @@ function createContext (width, height, options) {
   ctx._renderbuffers = {}
 
   ctx._activeProgram = null
-  ctx._activeFramebuffer = null
+  ctx._activeFramebuffers = { read: null, draw: null }
   ctx._activeRenderbuffer = null
   ctx._checkStencil = false
   ctx._stencilState = true
+
+  if (contextAttributes.createWebGL2Context) {
+    ctx._vaos = {}
+    ctx._activeVertexArrayObject = null
+  }
 
   // Initialize texture units
   const numTextures = ctx.getParameter(ctx.MAX_COMBINED_TEXTURE_IMAGE_UNITS)
   ctx._textureUnits = new Array(numTextures)
   for (let i = 0; i < numTextures; ++i) {
-    ctx._textureUnits[i] = new WebGLTextureUnit(i)
+    ctx._textureUnits[i] = new WebGLTextureUnit(ctx, i)
   }
   ctx._activeTextureUnit = 0
   ctx.activeTexture(ctx.TEXTURE0)
