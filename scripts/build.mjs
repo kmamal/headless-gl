@@ -38,7 +38,7 @@ await Fs.promises.cp(
 
 // Strip binaries on linux
 if (C.platform === 'linux') {
-	execSync(`strip -s ${Path.join(C.dir.dist, 'webgl.node')}`)
+	execSync(`strip -s "${Path.join(C.dir.dist, 'webgl.node')}"`)
 }
 
 // Include the prebuilt ANGLE libraries (copied next to the addon by binding.gyp)
