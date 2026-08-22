@@ -13,7 +13,7 @@ const pkgPath = Path.join(dir.root, 'package.json')
 const pkg = JSON.parse(Fs.readFileSync(pkgPath).toString())
 const version = pkg.version
 const isPrerelease = version.includes('-')
-const [ , owner, repo ] = pkg.repository.url.match(/([^/:]+)\/([^/]+).git$/u)
+const [ , owner, repo ] = pkg.repository.url.match(/([^/:]+)\/([^/]+)\.git$/u)
 
 const { platform, arch } = process
 const abi = process.versions.modules
