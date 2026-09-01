@@ -2605,11 +2605,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return super.viewport(x | 0, y | 0, width | 0, height | 0)
   }
 
-  _allocateDrawingBuffer (width, height) {
-    this._drawingBuffer = new WebGLDrawingBufferWrapper(
-      super.createFramebuffer(),
-      super.createTexture(),
-      super.createRenderbuffer())
+  _allocateDrawingBuffer (width, height, hasWindow) {
+    this._drawingBuffer = hasWindow
+      ? new WebGLDrawingBufferWrapper(0, 0, 0)
+      : new WebGLDrawingBufferWrapper(
+        super.createFramebuffer(),
+        super.createTexture(),
+        super.createRenderbuffer())
 
     this._resizeDrawingBuffer(width, height)
   }

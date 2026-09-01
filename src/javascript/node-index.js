@@ -35,6 +35,9 @@ function createContext (width, height, options) {
   contextAttributes.premultipliedAlpha =
     contextAttributes.premultipliedAlpha && contextAttributes.alpha
 
+  const window = options && options.window && options.window.gl
+  const hasWindow = Boolean(window)
+
   const WebGLContext = contextAttributes.createWebGL2Context ? WebGL2RenderingContext : WebGLRenderingContext
   let ctx
   try {
@@ -49,7 +52,8 @@ function createContext (width, height, options) {
       contextAttributes.preserveDrawingBuffer,
       contextAttributes.preferLowPowerToHighPerformance,
       contextAttributes.failIfMajorPerformanceCaveat,
-      contextAttributes.createWebGL2Context)
+      contextAttributes.createWebGL2Context,
+      window)
   } catch (e) {}
   if (!ctx) {
     return null
@@ -110,7 +114,7 @@ function createContext (width, height, options) {
   ctx._packAlignment = 4
 
   // Allocate framebuffer
-  ctx._allocateDrawingBuffer(width, height)
+  ctx._allocateDrawingBuffer(width, height, hasWindow)
 
   const attrib0Buffer = ctx.createBuffer()
   ctx._attrib0Buffer = attrib0Buffer
@@ -131,7 +135,7 @@ function createContext (width, height, options) {
   ctx.clearStencil(0)
   ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT | ctx.STENCIL_BUFFER_BIT)
 
-  return wrapContext(ctx)
+  return hasWindow ? ctx : wrapContext(ctx)
 }
 
 module.exports = createContext
