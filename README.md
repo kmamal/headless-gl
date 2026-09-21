@@ -3,12 +3,9 @@
 This is a simple fork of the [`gl`](https://github.com/stackgl/headless-gl#readme) package that adds a single feature:
 it can work together with [`@kmamal/sdl`](https://github.com/kmamal/node-sdl#readme) to allow WebGL drawing to actual windows.
 
-It should work on Linux, Mac, and Windows.
-Prebuilt binaries are available for x64 architectures, and arm-based Macs.
+It should work on Linux (X11 & Wayland), Mac, and Windows.
+Prebuilt binaries are available for x64 & arm architectures, on all supported platforms.
 
-On Linux, both X11 and Wayland windows are supported (matching `window.native.subsystem` from `@kmamal/sdl`).
-Wayland rendering goes through ANGLE's Vulkan backend, so it needs a working Vulkan driver.
-The Linux native-window payload is an ABI contract shared with `@kmamal/sdl`: versions of this package from 10 on require `@kmamal/sdl` >= 0.12, and older versions only work with older sdl.
 
 ## Example
 
