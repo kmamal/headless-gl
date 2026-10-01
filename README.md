@@ -1,10 +1,10 @@
 # @kmamal/gl
 
-This is a simple fork of the [`gl`](https://github.com/stackgl/headless-gl#readme) package that adds a single feature:
-it can work together with [`@kmamal/sdl`](https://github.com/kmamal/node-sdl#readme) to allow WebGL drawing to actual windows.
+This is a simple fork of the [`gl`](https://github.com/stackgl/headless-gl#readme) package with one added feature.
+Together with [`@kmamal/sdl`](https://github.com/kmamal/node-sdl#readme), it lets you draw WebGL to real windows.
 
-It should work on Linux (X11 & Wayland), Mac, and Windows.
-Prebuilt binaries are available for x64 & arm architectures, on all supported platforms.
+It should work on Linux (X11 and Wayland), Mac, and Windows.
+Prebuilt binaries exist for x64 and arm architectures on all supported platforms.
 
 
 ## Example
@@ -14,7 +14,7 @@ const sdl = require('@kmamal/sdl')
 const createContext = require('@kmamal/gl')
 
 const window = sdl.video.createWindow({
-  title: "Hello, World!"
+  title: "Hello, World!",
   opengl: true,
 })
 
