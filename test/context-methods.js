@@ -7,6 +7,7 @@ tape('private methods are not exposed', function (t) {
   for (const gl of [createContext(4, 4), createContext(4, 4, { createWebGL2Context: true })]) {
     t.equal(gl.setError, undefined, 'setError')
     t.equal(gl.getUniformuiv, undefined, 'getUniformuiv')
+    t.equal(gl.swap, undefined, 'swap without a window')
     t.equal(typeof gl.resize, 'function', 'resize')
     gl.resize(6, 5)
     t.equal(gl.drawingBufferWidth, 6)

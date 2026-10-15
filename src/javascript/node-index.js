@@ -34,6 +34,21 @@ function createContext (width, height, options) {
   contextAttributes.premultipliedAlpha =
     contextAttributes.premultipliedAlpha && contextAttributes.alpha
 
+  let window = null
+  let windowHandle = null
+  if (options && options.window !== undefined) {
+    window = options.window
+    if (!window || typeof window !== 'object' || !('native' in window)) {
+      throw new Error('window must be an @kmamal/sdl window')
+    }
+    if (window.destroyed) { throw new Error('window is destroyed') }
+    windowHandle = window.native && window.native.gl
+    if (!ArrayBuffer.isView(windowHandle)) {
+      throw new Error('window has no OpenGL handle, create it with { opengl: true }')
+    }
+  }
+  const hasWindow = window !== null
+
   const WebGLContext = contextAttributes.createWebGL2Context ? WebGL2RenderingContext : WebGLRenderingContext
   let ctx
   try {
@@ -48,12 +63,16 @@ function createContext (width, height, options) {
       contextAttributes.preserveDrawingBuffer,
       contextAttributes.preferLowPowerToHighPerformance,
       contextAttributes.failIfMajorPerformanceCaveat,
-      contextAttributes.createWebGL2Context)
-  } catch (e) {}
+      contextAttributes.createWebGL2Context,
+      windowHandle)
+  } catch (e) {
+    if (hasWindow) { throw e }
+  }
   if (!ctx) {
     return null
   }
 
+  ctx._window = window
   ctx.drawingBufferWidth = width
   ctx.drawingBufferHeight = height
 
@@ -61,7 +80,7 @@ function createContext (width, height, options) {
 
   ctx._contextAttributes = contextAttributes
 
-  initContext(ctx, width, height)
+  initContext(ctx, width, height, hasWindow)
 
   return wrapContext(ctx)
 }

@@ -60,7 +60,7 @@ function resetContext (ctx) {
   for (const ext of Object.values(extensions)) {
     if (ext && ext._vaos) { Object.values(ext._vaos).forEach(invalidateObject) }
   }
-  initContext(ctx, ctx.drawingBufferWidth, ctx.drawingBufferHeight)
+  initContext(ctx, ctx.drawingBufferWidth, ctx.drawingBufferHeight, ctx._hasWindow)
   if (extensions.webgl_lose_context) { ctx._extensions.webgl_lose_context = extensions.webgl_lose_context }
   ctx._compressedFormats = null
 }

@@ -6,7 +6,7 @@ const { getOESStandardDerivatives } = require('./extensions/oes-standard-derivat
 const { getOESTextureFloat } = require('./extensions/oes-texture-float')
 const { getOESTextureFloatLinear } = require('./extensions/oes-texture-float-linear')
 const { getSTACKGLDestroyContext } = require('./extensions/stackgl-destroy-context')
-const { getWebGLLoseContext } = require('./extensions/webgl-lose-context')
+const { getWebGLLoseContext, markContextLost } = require('./extensions/webgl-lose-context')
 const {
   getWebGLCompressedTextureS3TC,
   getWebGLCompressedTextureS3TCSRGB,
@@ -140,7 +140,10 @@ function wrapContext (ctx) {
   })
 
   const masked = ctx._isWebGL2() ? webgl1OnlyMethods : webgl2OnlyMethods
-  const hidden = privateMethods.concat(masked)
+  let hidden = privateMethods.concat(masked)
+  if (!ctx._hasWindow) {
+    hidden = hidden.concat(['swap'])
+  }
   let proto = ctx
   while (proto && proto !== Object.prototype) {
     bindPublics(Object.keys(proto), wrapper, ctx, hidden, hiddenProto)
@@ -532,6 +535,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   _resizeDrawingBuffer (width, height) {
+    if (this._hasWindow) { return }
     const unpackBuffer = this._isWebGL2() ? this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER) : null
     if (unpackBuffer) {
       super.bindBuffer(this.PIXEL_UNPACK_BUFFER, 0)
@@ -2736,6 +2740,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
   }
 
+  swap () {
+    if (this._window && this._window.destroyed) { throw new Error('window is destroyed') }
+    if (!super.swap()) { markContextLost(this, false) }
+  }
+
   sampleCoverage (value, invert) {
     return super.sampleCoverage(+value, !!invert)
   }
@@ -3071,7 +3080,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return super.viewport(x | 0, y | 0, width | 0, height | 0)
   }
 
-  _allocateDrawingBuffer (width, height) {
+  _allocateDrawingBuffer (width, height, hasWindow) {
+    this._hasWindow = hasWindow
+    if (hasWindow) {
+      this._drawingBuffer = new WebGLDrawingBufferWrapper(0, 0, 0)
+      return
+    }
     this._drawingBuffer = new WebGLDrawingBufferWrapper(
       super.createFramebuffer(),
       super.createTexture(),

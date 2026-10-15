@@ -59,6 +59,7 @@
                 'files': [
                   '<(module_root_dir)/deps/linux-arm64/so/libEGL.so',
                   '<(module_root_dir)/deps/linux-arm64/so/libGLESv2.so',
+                  '<(module_root_dir)/deps/linux-arm64/so/libvulkan.so.1',
                 ]
               }
            ]
@@ -70,6 +71,7 @@
                 'files': [
                   '<(module_root_dir)/deps/linux/so/libEGL.so',
                   '<(module_root_dir)/deps/linux/so/libGLESv2.so',
+                  '<(module_root_dir)/deps/linux/so/libvulkan.so.1',
                 ]
               }
            ]

@@ -589,6 +589,9 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
   }
 
   _defaultFramebufferAttachment (attachment) {
+    if (this._hasWindow) {
+      return attachment
+    }
     switch (attachment) {
       case this.BACK:
       case this.COLOR:

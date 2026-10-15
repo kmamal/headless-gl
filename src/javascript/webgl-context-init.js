@@ -3,7 +3,7 @@ const { WebGLTextureUnit } = require('./webgl-texture-unit')
 const { WebGLTransformFeedback } = require('./webgl-transform-feedback')
 const { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } = require('./webgl-vertex-attribute')
 
-function initContext (ctx, width, height) {
+function initContext (ctx, width, height, hasWindow) {
   ctx._extensions = {}
   ctx._programs = {}
   ctx._shaders = {}
@@ -72,7 +72,7 @@ function initContext (ctx, width, height) {
   ctx._packAlignment = 4
 
   // Allocate framebuffer
-  ctx._allocateDrawingBuffer(width, height)
+  ctx._allocateDrawingBuffer(width, height, hasWindow)
 
   const attrib0Buffer = ctx.createBuffer()
   ctx._attrib0Buffer = attrib0Buffer

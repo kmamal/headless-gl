@@ -41,6 +41,20 @@ enum GLContextState {
 
 bool CaseInsensitiveCompare(const std::string &a, const std::string &b);
 
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#define LINUX_NATIVE_DATA
+#endif
+
+#ifdef LINUX_NATIVE_DATA
+// Tagged native-window payload produced by @kmamal/sdl on Linux and the BSDs. The layout is
+// an ABI contract shared by @kmamal/sdl, @kmamal/gl, and @kmamal/gpu.
+struct LinuxNativeData {
+  uint64_t subsystem; // 1 = x11, 2 = wayland
+  void *display;      // Display*   | wl_display*
+  uintptr_t window;   // Window XID | wl_egl_window*
+};
+#endif
+
 enum UnpackStatus { UNPACK_OK, UNPACK_PASSTHROUGH, UNPACK_TOO_SMALL };
 
 using GLObjectReference = std::pair<GLuint, GLObjectType>;
@@ -49,14 +63,21 @@ using WebGLToANGLEExtensionsMap =
 
 struct WebGLRenderingContext : public node::ObjectWrap {
 
-  // The underlying OpenGL context
-  static bool HAS_DISPLAY;
-  static EGLDisplay DISPLAY;
+  // The underlying EGL displays, initialized on first use. The nullptr key is
+  // the default display; a non-null key is the wl_display the entry was
+  // created from (Wayland objects are per-connection, so each connection
+  // needs its own EGLDisplay).
+  static std::map<void *, EGLDisplay> DISPLAY_CACHE;
+  static std::map<void *, int> DISPLAY_REFS;
 
   SharedLibrary eglLibrary;
+  EGLDisplay display;
+  void *displayKey;
+  EGLint swapError;
   EGLContext context;
   EGLConfig config;
   EGLSurface surface;
+  bool holdsDisplayRef;
   GLContextState state;
   std::string errorMessage;
 
@@ -105,11 +126,13 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   WebGLRenderingContext(int width, int height, bool alpha, bool depth, bool stencil, bool antialias,
                         bool premultipliedAlpha, bool preserveDrawingBuffer,
                         bool preferLowPowerToHighPerformance, bool failIfMajorPerformanceCaveat,
-                        bool createWebGL2Context);
+                        bool createWebGL2Context, void *windowHandle);
   virtual ~WebGLRenderingContext();
 
+  bool swap();
   bool restoreContext();
   void loadExtensions();
+  void releaseEGL();
 
   // Context validation
   static WebGLRenderingContext *ACTIVE;
@@ -138,6 +161,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(New);
   static NAN_METHOD(Destroy);
 
+  static NAN_METHOD(Swap);
   static NAN_METHOD(RestoreContext);
 
   static NAN_METHOD(VertexAttribDivisorANGLE);
