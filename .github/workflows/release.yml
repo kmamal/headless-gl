@@ -1,74 +1,11 @@
-name: Prebuild, Create Release, Publish
+name: Build and upload
 
-on:
-  push:
-    tags:
-      - 'v*'
+on: workflow_dispatch
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        node-version: [26.x]
-        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
-        target: ["22.0.0", "24.0.0", "26.0.0"]
-    runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: write
-      attestations: write
-      packages: read
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          registry-url: 'https://npm.pkg.github.com'
-      - if: runner.os == 'Linux'
-        run: >
-          sudo add-apt-repository ppa:kisak/kisak-mesa &&
-          sudo apt update &&
-          sudo apt-get install -y build-essential libgl1-mesa-dri libglapi-mesa libglew-dev libglu1-mesa-dev libosmesa6 libxi-dev mesa-utils pkg-config
-      - run: npm ci --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Prebuild and Publish
-        shell: bash
-        run: node ./node_modules/prebuild/bin.js -t ${{ matrix.target }} --strip --include-regex "\.(node|dylib|dll|so)$" -u ${{ secrets.GITHUB_TOKEN }} --verbose
-      - name: Prebuild and Publish (musl)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: node ./node_modules/prebuild/bin.js --libc=musl -t ${{ matrix.target }} --strip --include-regex "\.(node|dylib|dll|so)$" -u ${{ secrets.GITHUB_TOKEN }} --verbose
-      - name: Attest
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: 'prebuilds/*.tar.gz'
-
-  publish:
-    name: Publish to NPM
-    needs:
-      - build
+  empty:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '26.x'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
-      - id: release_tag
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if [[ "$VERSION" == *"-"* ]]; then
-            echo "TAG=next" >> $GITHUB_ENV
-          else
-            echo "TAG=latest" >> $GITHUB_ENV
-          fi
-      - name: Publish to NPM
-        run: npm publish --tag "$TAG" --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: 'echo "empty"'
+
+# This file is empty on the master branch. Releases are made from the 'workflow' branch.
