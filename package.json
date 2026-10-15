@@ -4,10 +4,10 @@
   "description": "Fork of `gl` that can render to windows",
   "main": "./index.js",
   "browser": "./src/javascript/browser-index.js",
-  "types": "./index.d.ts",
+  "types": "./src/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
+      "types": "./src/types/index.d.ts",
       "browser": "./src/javascript/browser-index.js",
       "default": "./index.js"
     }
