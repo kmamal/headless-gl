@@ -283,6 +283,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return super.getParameter(pname)
   }
 
+  _getActiveTextureForImage (target) {
+    if (validCubeTarget(target)) {
+      return this._getActiveTexture(this.TEXTURE_CUBE_MAP)
+    }
+    return this._getActiveTexture(target)
+  }
+
   _getTexImage (target) {
     const unit = this._getActiveTextureUnit()
     if (target === this.TEXTURE_2D) {
@@ -1139,6 +1146,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     height |= 0
     border |= 0
 
+    if (this._getActiveTextureForImage(target) === null) {
+      if (target === this.TEXTURE_2D || validCubeTarget(target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+    }
+
     this._saveError()
     super.copyTexImage2D(
       target,
@@ -1172,6 +1186,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     y |= 0
     width |= 0
     height |= 0
+
+    if (this._getActiveTextureForImage(target) === null) {
+      if (target === this.TEXTURE_2D || validCubeTarget(target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+    }
 
     super.copyTexSubImage2D(
       target,
@@ -2369,8 +2390,8 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
 
     // Note: there's an ANGLE bug where it doesn't check for setting texImage2D on texture zero in WebGL compat.
-    if (this._getActiveTexture(target) === null) {
-      if (target === this.TEXTURE_2D || target === this.TEXTURE_CUBE_MAP) {
+    if (this._getActiveTextureForImage(target) === null) {
+      if (target === this.TEXTURE_2D || validCubeTarget(target)) {
         this.setError(this.INVALID_OPERATION)
         return
       }
