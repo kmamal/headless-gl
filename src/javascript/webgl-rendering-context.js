@@ -2993,9 +2993,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   vertexAttrib1fv (index, value) {
     if (typeof value !== 'object' || value === null || value.length < 1) {
-      this.setError(this.INVALID_OPERATION)
+      this.setError(this.INVALID_VALUE)
       return
     }
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
     data[3] = 1
     data[2] = 0
@@ -3006,9 +3008,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   vertexAttrib2fv (index, value) {
     if (typeof value !== 'object' || value === null || value.length < 2) {
-      this.setError(this.INVALID_OPERATION)
+      this.setError(this.INVALID_VALUE)
       return
     }
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
     data[3] = 1
     data[2] = 0
@@ -3019,9 +3023,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   vertexAttrib3fv (index, value) {
     if (typeof value !== 'object' || value === null || value.length < 3) {
-      this.setError(this.INVALID_OPERATION)
+      this.setError(this.INVALID_VALUE)
       return
     }
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
     data[3] = 1
     data[2] = value[2]
@@ -3032,9 +3038,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   vertexAttrib4fv (index, value) {
     if (typeof value !== 'object' || value === null || value.length < 4) {
-      this.setError(this.INVALID_OPERATION)
+      this.setError(this.INVALID_VALUE)
       return
     }
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
     data[3] = value[3]
     data[2] = value[2]
