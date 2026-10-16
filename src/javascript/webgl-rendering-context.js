@@ -40,6 +40,7 @@ const { WebGLTexture } = require('./webgl-texture')
 const { WebGLUniformLocation } = require('./webgl-uniform-location')
 const { WebGLVertexArrayObject } = require('./webgl-vertex-array-object')
 const { getEXTColorBufferFloat } = require('./extensions/ext-color-buffer-float')
+const { getEXTColorBufferHalfFloat } = require('./extensions/ext-color-buffer-half-float')
 
 // These are defined by the WebGL spec
 const MAX_IDENTIFIER_LENGTH = 256
@@ -67,7 +68,8 @@ const availableExtensions = {
   ext_blend_minmax: getEXTBlendMinMax,
   ext_texture_filter_anisotropic: getEXTTextureFilterAnisotropic,
   ext_shader_texture_lod: getEXTShaderTextureLod,
-  ext_color_buffer_float: getEXTColorBufferFloat
+  ext_color_buffer_float: getEXTColorBufferFloat,
+  ext_color_buffer_half_float: getEXTColorBufferHalfFloat
 }
 
 const privateMethods = [
@@ -599,6 +601,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return mode === this.FUNC_ADD ||
       mode === this.FUNC_SUBTRACT ||
       mode === this.FUNC_REVERSE_SUBTRACT ||
+      (this._isWebGL2() && (mode === 0x8007 || mode === 0x8008)) ||
       (this._extensions.ext_blend_minmax && (
         mode === this._extensions.ext_blend_minmax.MIN_EXT ||
         mode === this._extensions.ext_blend_minmax.MAX_EXT))
@@ -1118,6 +1121,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return null
     }
 
+    if (!super.getSupportedExtensions().toLowerCase().split(' ').includes(str)) { return null }
     super.getExtension(str)
     const ext = availableExtensions[str](this)
     this._extensions[str] = ext

@@ -364,6 +364,8 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   webGLToANGLEExtensions.insert({"OES_texture_float_linear", {"GL_OES_texture_float_linear"}});
   if (createWebGL2Context) {
     webGLToANGLEExtensions.insert({"EXT_color_buffer_float", {"GL_EXT_color_buffer_float"}});
+    webGLToANGLEExtensions.insert(
+        {"EXT_color_buffer_half_float", {"GL_EXT_color_buffer_half_float"}});
   } else {
     webGLToANGLEExtensions.insert({"ANGLE_instanced_arrays", {"GL_ANGLE_instanced_arrays"}});
     webGLToANGLEExtensions.insert({"OES_element_index_uint", {"GL_OES_element_index_uint"}});
@@ -2104,7 +2106,10 @@ GL_METHOD(GetParameter) {
   case GL_POLYGON_OFFSET_FILL:
   case GL_SAMPLE_COVERAGE_INVERT:
   case GL_SCISSOR_TEST:
-  case GL_STENCIL_TEST: {
+  case GL_STENCIL_TEST:
+  case GL_SAMPLE_ALPHA_TO_COVERAGE:
+  case GL_SAMPLE_COVERAGE:
+  case GL_RASTERIZER_DISCARD: {
     GLboolean params = GL_FALSE;
     glGetBooleanvRobustANGLE(name, sizeof(GLboolean), &bytesWritten, &params);
 
@@ -2118,11 +2123,32 @@ GL_METHOD(GetParameter) {
   case GL_POLYGON_OFFSET_FACTOR:
   case GL_POLYGON_OFFSET_UNITS:
   case GL_SAMPLE_COVERAGE_VALUE:
+  case GL_MAX_TEXTURE_LOD_BIAS:
   case GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT: {
     GLfloat params = 0;
     glGetFloatvRobustANGLE(name, sizeof(GLfloat), &bytesWritten, &params);
 
     ReturnParamValueOrNull(info, Nan::New<v8::Number>(params), bytesWritten);
+
+    return;
+  }
+
+  case GL_MAX_ELEMENT_INDEX:
+  case GL_MAX_SERVER_WAIT_TIMEOUT:
+  case GL_MAX_UNIFORM_BLOCK_SIZE:
+  case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
+  case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS: {
+    if (!inst->isWebGL2) {
+      GLint params = 0;
+      glGetIntegervRobustANGLE(name, sizeof(GLint), &bytesWritten, &params);
+      ReturnParamValueOrNull(info, Nan::New<v8::Integer>(params), bytesWritten);
+      return;
+    }
+
+    GLint64 params = 0;
+    glGetInteger64v(name, &params);
+
+    info.GetReturnValue().Set(Nan::New<v8::Number>(static_cast<double>(params)));
 
     return;
   }
@@ -2652,7 +2678,21 @@ GL_METHOD(GetInternalformatParameter) {
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
   GLenum internalformat = Nan::To<int32_t>(info[1]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[2]).ToChecked();
-  GLint result;
+  if (pname == GL_SAMPLES) {
+    GLint count = 0;
+    glGetInternalformativ(target, internalformat, GL_NUM_SAMPLE_COUNTS, 1, &count);
+    std::vector<GLint> samples(count);
+    if (count > 0) {
+      glGetInternalformativ(target, internalformat, pname, count, samples.data());
+    }
+    v8::Local<v8::Array> result = Nan::New<v8::Array>(count);
+    for (GLint i = 0; i < count; i++) {
+      Nan::Set(result, i, Nan::New(samples[i]));
+    }
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  GLint result = 0;
   glGetInternalformativ(target, internalformat, pname, 1, &result);
   info.GetReturnValue().Set(Nan::New(result));
 }

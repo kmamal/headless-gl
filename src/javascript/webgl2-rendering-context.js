@@ -1,3 +1,4 @@
+const HEADLESS_VERSION = require('../../package.json').version
 const { gl, NativeWebGL } = require('./native-gl')
 const { WebGLRenderingContextHelper } = require('./webgl-rendering-context')
 const { WebGLProgram } = require('./webgl-program')
@@ -10,13 +11,38 @@ const { WebGLActiveInfo } = require('./webgl-active-info')
 const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
+const PRIMITIVE_RESTART_FIXED_INDEX = 0x8D69
 
+const DESKTOP_ONLY_PARAMETERS = [
+  0x1F03,
+  0x821B,
+  0x821C,
+  0x821D,
+  0x86A2,
+  0x87FE,
+  0x87FF,
+  0x8DF8,
+  0x8DF9,
+  0x8DFA,
+  PRIMITIVE_RESTART_FIXED_INDEX
+]
 const MAX_CLIENT_WAIT_TIMEOUT = 1000000000
 
 function isSequence (value) {
   return value !== null && typeof value === 'object' &&
     (Array.isArray(value) || ArrayBuffer.isView(value) || typeof value[Symbol.iterator] === 'function')
 }
+
+const WEBGL1_ONLY_EXTENSIONS = [
+  'angle_instanced_arrays',
+  'ext_blend_minmax',
+  'ext_shader_texture_lod',
+  'oes_element_index_uint',
+  'oes_standard_derivatives',
+  'oes_texture_float',
+  'oes_vertex_array_object',
+  'webgl_draw_buffers'
+]
 
 class WebGL2RenderingContext extends WebGLRenderingContextHelper {
   _uniformData (Type, value, srcOffset, srcLength, name) {
@@ -98,6 +124,30 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       throw new TypeError('uniformBlockBinding(WebGLProgram, GLuint, GLuint)')
     }
     return super.uniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding)
+  }
+
+  enable (cap) {
+    if ((cap | 0) === PRIMITIVE_RESTART_FIXED_INDEX) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    return super.enable(cap)
+  }
+
+  disable (cap) {
+    if ((cap | 0) === PRIMITIVE_RESTART_FIXED_INDEX) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    return super.disable(cap)
+  }
+
+  isEnabled (cap) {
+    if ((cap | 0) === PRIMITIVE_RESTART_FIXED_INDEX) {
+      this.setError(this.INVALID_ENUM)
+      return false
+    }
+    return super.isEnabled(cap)
   }
 
   getProgramParameter (program, pname) {
@@ -973,6 +1023,7 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       case this.R16F:
       case this.RG16F:
       case this.RGBA16F:
+        return Boolean(this._extensions.ext_color_buffer_float || this._extensions.ext_color_buffer_half_float)
       case this.R32F:
       case this.RG32F:
       case this.RGBA32F:
@@ -1074,6 +1125,16 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
 
   getParameter (pname) {
     pname |= 0
+    if (DESKTOP_ONLY_PARAMETERS.indexOf(pname) >= 0) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    if (pname === this.VERSION) {
+      return 'WebGL 2.0 stack-gl ' + HEADLESS_VERSION
+    }
+    if (pname === this.SHADING_LANGUAGE_VERSION) {
+      return 'WebGL GLSL ES 3.00 stack-gl'
+    }
     if (pname === this.VERTEX_ARRAY_BINDING) {
       return this._activeVertexArrayObject
     }
@@ -1980,6 +2041,46 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       return
     }
     return super.linkProgram(program)
+  }
+
+  getExtension (name) {
+    if (WEBGL1_ONLY_EXTENSIONS.indexOf((name + '').toLowerCase()) >= 0) {
+      return null
+    }
+    return super.getExtension(name)
+  }
+
+  getInternalformatParameter (target, internalFormat, pname) {
+    target |= 0
+    internalFormat |= 0
+    pname |= 0
+    if (target !== this.RENDERBUFFER || pname !== this.SAMPLES || !this._isRenderbufferFormat(internalFormat)) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    this._saveError()
+    const samples = super.getInternalformatParameter(target, internalFormat, pname)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error !== this.NO_ERROR) {
+      return null
+    }
+    return new Int32Array(samples)
+  }
+
+  hint (target, mode) {
+    target |= 0
+    mode |= 0
+    if (target === this.FRAGMENT_SHADER_DERIVATIVE_HINT) {
+      if (mode !== this.FASTEST &&
+        mode !== this.NICEST &&
+        mode !== this.DONT_CARE) {
+        this.setError(this.INVALID_ENUM)
+        return
+      }
+      return gl.hint.call(this, target, mode)
+    }
+    return super.hint(target, mode)
   }
 
   getUniformLocation (program, name) {
