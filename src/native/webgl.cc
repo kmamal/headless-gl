@@ -206,6 +206,19 @@ bool CaseInsensitiveCompare(const std::string &a, const std::string &b) {
   return aLower < bLower;
 };
 
+static EGLContext CreateEGLContext(EGLDisplay display, EGLConfig config, bool webGL2) {
+  EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION,
+                             webGL2 ? 3 : 2,
+                             EGL_CONTEXT_WEBGL_COMPATIBILITY_ANGLE,
+                             EGL_TRUE,
+                             EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE,
+                             EGL_FALSE,
+                             EGL_ROBUST_RESOURCE_INITIALIZATION_ANGLE,
+                             EGL_TRUE,
+                             EGL_NONE};
+  return eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
+}
+
 WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, bool depth,
                                              bool stencil, bool antialias, bool premultipliedAlpha,
                                              bool preserveDrawingBuffer,
@@ -291,16 +304,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   }
 
   // Create context
-  EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION,
-                             createWebGL2Context ? 3 : 2,
-                             EGL_CONTEXT_WEBGL_COMPATIBILITY_ANGLE,
-                             EGL_TRUE,
-                             EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE,
-                             EGL_FALSE,
-                             EGL_ROBUST_RESOURCE_INITIALIZATION_ANGLE,
-                             EGL_TRUE,
-                             EGL_NONE};
-  context = eglCreateContext(DISPLAY, config, EGL_NO_CONTEXT, contextAttribs);
+  context = CreateEGLContext(DISPLAY, config, createWebGL2Context);
   if (context == EGL_NO_CONTEXT) {
     state = GLCONTEXT_STATE_ERROR;
     return;
@@ -338,15 +342,8 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   // std::cout << "ANGLE GL_VERSION: " << versionString << std::endl;
 
   // Check extensions
+  loadExtensions();
   const char *extensionsString = (const char *)(glGetString(GL_EXTENSIONS));
-  enabledExtensions = GetStringSetFromCString(extensionsString);
-
-  const char *requestableExtensionsString =
-      (const char *)glGetString(GL_REQUESTABLE_EXTENSIONS_ANGLE);
-  requestableExtensions = GetStringSetFromCString(requestableExtensionsString);
-
-  // Request necessary WebGL extensions.
-  glRequestExtensionANGLE("GL_EXT_texture_storage");
 
   // Select best preferred depth
   preferredDepth = GL_DEPTH_COMPONENT16;
@@ -406,6 +403,41 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
     rdoc_api->StartFrameCapture(NULL, NULL);
   }
 #endif
+}
+
+void WebGLRenderingContext::loadExtensions() {
+  enabledExtensions = GetStringSetFromCString((const char *)glGetString(GL_EXTENSIONS));
+  requestableExtensions =
+      GetStringSetFromCString((const char *)glGetString(GL_REQUESTABLE_EXTENSIONS_ANGLE));
+
+  // Request necessary WebGL extensions.
+  glRequestExtensionANGLE("GL_EXT_texture_storage");
+}
+
+bool WebGLRenderingContext::restoreContext() {
+  if (state != GLCONTEXT_STATE_OK) {
+    return false;
+  }
+  EGLContext restored = CreateEGLContext(DISPLAY, config, isWebGL2);
+  if (restored == EGL_NO_CONTEXT) {
+    return false;
+  }
+  if (!eglMakeCurrent(DISPLAY, surface, surface, restored)) {
+    eglDestroyContext(DISPLAY, restored);
+    setActive();
+    return false;
+  }
+  eglDestroyContext(DISPLAY, context);
+  context = restored;
+  ACTIVE = this;
+  objects.clear();
+  errorSet.clear();
+  unpack_flip_y = false;
+  unpack_premultiply_alpha = false;
+  unpack_colorspace_conversion = 0x9244;
+  unpack_alignment = 4;
+  loadExtensions();
+  return true;
 }
 
 bool WebGLRenderingContext::setActive() {
@@ -564,6 +596,11 @@ GL_METHOD(Destroy) {
   GL_BOILERPLATE
 
   inst->dispose();
+}
+
+GL_METHOD(RestoreContext) {
+  GL_BOILERPLATE;
+  info.GetReturnValue().Set(inst->restoreContext());
 }
 
 GL_METHOD(Uniform1f) {

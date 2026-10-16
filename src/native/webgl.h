@@ -108,6 +108,9 @@ struct WebGLRenderingContext : public node::ObjectWrap {
                         bool createWebGL2Context);
   virtual ~WebGLRenderingContext();
 
+  bool restoreContext();
+  void loadExtensions();
+
   // Context validation
   static WebGLRenderingContext *ACTIVE;
   bool setActive();
@@ -134,6 +137,8 @@ struct WebGLRenderingContext : public node::ObjectWrap {
 
   static NAN_METHOD(New);
   static NAN_METHOD(Destroy);
+
+  static NAN_METHOD(RestoreContext);
 
   static NAN_METHOD(VertexAttribDivisorANGLE);
   static NAN_METHOD(DrawArraysInstancedANGLE);

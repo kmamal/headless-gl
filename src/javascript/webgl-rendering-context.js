@@ -6,6 +6,7 @@ const { getOESStandardDerivatives } = require('./extensions/oes-standard-derivat
 const { getOESTextureFloat } = require('./extensions/oes-texture-float')
 const { getOESTextureFloatLinear } = require('./extensions/oes-texture-float-linear')
 const { getSTACKGLDestroyContext } = require('./extensions/stackgl-destroy-context')
+const { getWebGLLoseContext } = require('./extensions/webgl-lose-context')
 const {
   getWebGLCompressedTextureS3TC,
   getWebGLCompressedTextureS3TCSRGB,
@@ -71,6 +72,7 @@ const availableExtensions = {
   oes_standard_derivatives: getOESStandardDerivatives,
   oes_vertex_array_object: getOESVertexArrayObject,
   stackgl_destroy_context: getSTACKGLDestroyContext,
+  webgl_lose_context: getWebGLLoseContext,
   webgl_compressed_texture_s3tc: getWebGLCompressedTextureS3TC,
   webgl_compressed_texture_s3tc_srgb: getWebGLCompressedTextureS3TCSRGB,
   webgl_compressed_texture_etc: getWebGLCompressedTextureETC,
@@ -125,10 +127,17 @@ const webgl2OnlyMethods = [
   'vertexAttribI4iv', 'vertexAttribI4ui', 'vertexAttribI4uiv', 'vertexAttribIPointer', 'waitSync'
 ]
 
+const jsOnlyExtensions = new Set(['webgl_lose_context', 'stackgl_destroy_context', 'stackgl_resize_drawingbuffer'])
+
 function wrapContext (ctx) {
   const wrapper = new ctx.constructor()
   const hiddenProto = Object.create(Object.getPrototypeOf(wrapper))
   Object.setPrototypeOf(wrapper, hiddenProto)
+  Object.defineProperty(hiddenProto, 'canvas', {
+    get () { return ctx.canvas },
+    set (value) { ctx.canvas = value },
+    enumerable: true
+  })
 
   const masked = ctx._isWebGL2() ? webgl1OnlyMethods : webgl2OnlyMethods
   const hidden = privateMethods.concat(masked)
@@ -146,6 +155,15 @@ function wrapContext (ctx) {
     }
   }
 
+  for (const key of Object.keys(wrapper)) {
+    const method = wrapper[key]
+    if (typeof method !== 'function' || lostPassthrough.has(key)) { continue }
+    wrapper[key] = function (...args) {
+      if (ctx._contextLost) { return lostResult(ctx, key, args) }
+      return method.apply(null, args)
+    }
+  }
+
   Object.defineProperties(wrapper, {
     drawingBufferWidth: {
       get () { return ctx.drawingBufferWidth },
@@ -158,6 +176,37 @@ function wrapContext (ctx) {
   })
 
   return wrapper
+}
+
+const lostPassthrough = new Set(['isContextLost', 'getError', 'destroy', 'resize'])
+const lostExtensionPassthrough = new Set(['getSupportedProfiles'])
+
+function lostResult (ctx, name, args) {
+  if (name === 'getExtension' && String(args[0]).toLowerCase().startsWith('stackgl_')) { return ctx.getExtension(args[0]) }
+  if (name.startsWith('is')) { return false }
+  if (name === 'getAttribLocation' || name === 'getFragDataLocation') { return -1 }
+  if (name === 'getUniformBlockIndex') { return 0xFFFFFFFF }
+  if (name === 'getVertexAttribOffset') { return 0 }
+  if (name === 'checkFramebufferStatus') { return ctx.FRAMEBUFFER_UNSUPPORTED }
+  if (name === 'clientWaitSync') { return ctx.WAIT_FAILED }
+  if (name === 'fenceSync' || name.startsWith('get') || name.startsWith('create')) { return null }
+  return undefined
+}
+
+function guardExtension (ctx, ext) {
+  const names = new Set(Object.keys(ext))
+  const proto = Object.getPrototypeOf(ext)
+  if (proto && proto !== Object.prototype) {
+    for (const key of Object.getOwnPropertyNames(proto)) { names.add(key) }
+  }
+  for (const key of names) {
+    if (key === 'constructor' || lostExtensionPassthrough.has(key) || typeof ext[key] !== 'function') { continue }
+    const method = ext[key]
+    ext[key] = function (...args) {
+      if (ctx._contextLost) { return lostResult(ctx, key, args) }
+      return method.apply(ext, args)
+    }
+  }
 }
 
 // We need to wrap some of the native WebGL functions to handle certain error codes and check input values
@@ -1135,16 +1184,20 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return null
     }
 
-    if (!super.getSupportedExtensions().toLowerCase().split(' ').includes(str)) { return null }
-    super.getExtension(str)
+    if (!jsOnlyExtensions.has(str)) {
+      if (!super.getSupportedExtensions().toLowerCase().split(' ').includes(str)) { return null }
+      super.getExtension(str)
+    }
     const ext = availableExtensions[str](this)
+    if (ext && !jsOnlyExtensions.has(str)) { guardExtension(this, ext) }
     this._extensions[str] = ext
     return ext
   }
 
   getSupportedExtensions () {
-    const ret = super.getSupportedExtensions()
-    return ret.split(' ')
+    const ret = super.getSupportedExtensions().split(' ')
+    if (!ret.includes('WEBGL_lose_context')) { ret.push('WEBGL_lose_context') }
+    return ret
   }
 
   setError (error) {
@@ -1731,6 +1784,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   destroy () {
+    this._destroyed = true
     super.destroy()
   }
 
@@ -2089,6 +2143,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   getError () {
+    if (this._contextLost) {
+      const error = this._contextLostError
+      this._contextLostError = this.NO_ERROR
+      return error
+    }
     return super.getError()
   }
 
@@ -2671,7 +2730,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new Error('Invalid surface dimensions')
     } else if (width !== this.drawingBufferWidth ||
       height !== this.drawingBufferHeight) {
-      this._resizeDrawingBuffer(width, height)
+      if (!this._contextLost) { this._resizeDrawingBuffer(width, height) }
       this.drawingBufferWidth = width
       this.drawingBufferHeight = height
     }
@@ -3022,7 +3081,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   isContextLost () {
-    return false
+    return this._contextLost === true
   }
 
   _imageSource (pixels, name) {
