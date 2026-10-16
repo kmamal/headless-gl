@@ -86,6 +86,7 @@ function createContext (width, height, options) {
     ctx._samplers = {}
     ctx._queries = {}
     ctx._activeQueries = {}
+    ctx._syncs = {}
     ctx._indexedBufferBindings[ctx.UNIFORM_BUFFER] =
       new Array(ctx.getParameter(ctx.MAX_UNIFORM_BUFFER_BINDINGS)).fill(null)
     ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] =

@@ -4,9 +4,12 @@ const { WebGLProgram } = require('./webgl-program')
 const { WebGLBuffer } = require('./webgl-buffer')
 const { WebGLSampler } = require('./webgl-sampler')
 const { WebGLQuery } = require('./webgl-query')
+const { WebGLSync } = require('./webgl-sync')
 const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
+
+const MAX_CLIENT_WAIT_TIMEOUT = 1000000000
 
 function isSequence (value) {
   return value !== null && typeof value === 'object' &&
@@ -1081,6 +1084,9 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     if (pname === this.SAMPLER_BINDING) {
       return this._getActiveTextureUnit()._sampler
     }
+    if (pname === this.MAX_CLIENT_WAIT_TIMEOUT_WEBGL) {
+      return MAX_CLIENT_WAIT_TIMEOUT
+    }
     if (pname === this.READ_BUFFER) {
       const framebuffer = this._activeFramebuffers.read
       return framebuffer ? framebuffer._readBuffer : this._defaultReadBuffer
@@ -1632,6 +1638,121 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       return super.getQueryParameter(query._ | 0, pname) !== 0
     }
     return super.getQueryParameter(query._ | 0, pname)
+  }
+
+  fenceSync (condition, flags) {
+    condition |= 0
+    flags |= 0
+    if (condition !== this.SYNC_GPU_COMMANDS_COMPLETE) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    if (flags !== 0) {
+      this.setError(this.INVALID_VALUE)
+      return null
+    }
+    const id = super.fenceSync(condition, flags)
+    if (!id) return null
+    const sync = new WebGLSync(id, this)
+    this._syncs[id] = sync
+    sync._pending = true
+    setImmediate(function () {
+      sync._pending = false
+    })
+    return sync
+  }
+
+  isSync (object) {
+    if (!this._isObject(object, 'isSync', WebGLSync)) return false
+    return super.isSync(object._ | 0)
+  }
+
+  deleteSync (sync) {
+    if (!checkObject(sync)) {
+      throw new TypeError('deleteSync(WebGLSync)')
+    }
+
+    if (!sync) {
+      return
+    }
+
+    if (!(sync instanceof WebGLSync &&
+      this._checkOwns(sync))) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (sync._pendingDelete) {
+      return
+    }
+
+    sync._pendingDelete = true
+    sync._checkDelete()
+  }
+
+  clientWaitSync (sync, flags, timeout) {
+    flags |= 0
+    timeout = +timeout
+    if (!sync || !checkObject(sync)) {
+      throw new TypeError('clientWaitSync(WebGLSync, GLbitfield, GLuint64)')
+    }
+    if (!this._checkWrapper(sync, WebGLSync)) {
+      return this.WAIT_FAILED
+    }
+    if (flags & ~this.SYNC_FLUSH_COMMANDS_BIT) {
+      this.setError(this.INVALID_VALUE)
+      return this.WAIT_FAILED
+    }
+    if (!(timeout >= 0) || timeout > MAX_CLIENT_WAIT_TIMEOUT) {
+      this.setError(this.INVALID_OPERATION)
+      return this.WAIT_FAILED
+    }
+    if (sync._pending) {
+      if (flags & this.SYNC_FLUSH_COMMANDS_BIT) {
+        this.flush()
+      }
+      return this.TIMEOUT_EXPIRED
+    }
+    return super.clientWaitSync(sync._ | 0, flags, timeout)
+  }
+
+  waitSync (sync, flags, timeout) {
+    flags |= 0
+    timeout = +timeout
+    if (!sync || !checkObject(sync)) {
+      throw new TypeError('waitSync(WebGLSync, GLbitfield, GLint64)')
+    }
+    if (!this._checkWrapper(sync, WebGLSync)) {
+      return
+    }
+    if (flags !== 0 || timeout !== this.TIMEOUT_IGNORED) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+    super.waitSync(sync._ | 0, flags, timeout)
+  }
+
+  getSyncParameter (sync, pname) {
+    pname |= 0
+    if (!sync || !checkObject(sync)) {
+      throw new TypeError('getSyncParameter(WebGLSync, GLenum)')
+    }
+    if (!this._checkWrapper(sync, WebGLSync)) {
+      return null
+    }
+    switch (pname) {
+      case this.SYNC_STATUS:
+        if (sync._pending) {
+          return this.UNSIGNALED
+        }
+        return super.getSyncParameter(sync._ | 0, pname)
+      case this.OBJECT_TYPE:
+      case this.SYNC_CONDITION:
+      case this.SYNC_FLAGS:
+        return super.getSyncParameter(sync._ | 0, pname)
+    }
+    this.setError(this.INVALID_ENUM)
+    return null
   }
 
   getUniformLocation (program, name) {

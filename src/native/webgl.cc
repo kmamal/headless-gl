@@ -118,6 +118,12 @@ GLenum SizeFloatingPointFormat(GLenum format) {
   return format;
 }
 
+GLsync IntToSync(uint32_t intValue) {
+  return reinterpret_cast<GLsync>(static_cast<uintptr_t>(intValue));
+}
+
+uint32_t SyncToInt(GLsync sync) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(sync)); }
+
 std::set<std::string> GetStringSetFromCString(const char *cstr) {
   std::set<std::string> result;
   std::istringstream iss(cstr); // Create an input string stream
@@ -461,6 +467,9 @@ void WebGLRenderingContext::dispose() {
       break;
     case GLOBJECT_TYPE_QUERY:
       glDeleteQueries(1, &obj);
+      break;
+    case GLOBJECT_TYPE_SYNC:
+      glDeleteSync(IntToSync(obj));
       break;
     default:
       break;
@@ -3147,17 +3156,14 @@ GL_METHOD(GetSamplerParameter) {
 }
 
 // ANGLE internally stores GLsync values as integer handles, so this is safe on ANGLE.
-GLsync IntToSync(uint32_t intValue) {
-  return reinterpret_cast<GLsync>(static_cast<uintptr_t>(intValue));
-}
-
-uint32_t SyncToInt(GLsync sync) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(sync)); }
-
 GL_METHOD(FenceSync) {
   GL_BOILERPLATE;
   GLenum condition = Nan::To<int32_t>(info[0]).ToChecked();
   GLbitfield flags = Nan::To<uint32_t>(info[1]).ToChecked();
   GLsync sync = glFenceSync(condition, flags);
+  if (sync != 0) {
+    inst->registerGLObj(GLOBJECT_TYPE_SYNC, SyncToInt(sync));
+  }
   info.GetReturnValue().Set(Nan::New(SyncToInt(sync)));
 }
 
@@ -3170,8 +3176,9 @@ GL_METHOD(IsSync) {
 
 GL_METHOD(DeleteSync) {
   GL_BOILERPLATE;
-  GLsync sync = IntToSync(Nan::To<uint32_t>(info[0]).ToChecked());
-  glDeleteSync(sync);
+  uint32_t handle = Nan::To<uint32_t>(info[0]).ToChecked();
+  inst->unregisterGLObj(GLOBJECT_TYPE_SYNC, handle);
+  glDeleteSync(IntToSync(handle));
 }
 
 GL_METHOD(ClientWaitSync) {
