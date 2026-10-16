@@ -77,8 +77,7 @@ const privateMethods = [
 ]
 
 function wrapContext (ctx) {
-  const isWebGL2 = ctx.constructor.name === 'WebGL2RenderingContext'
-  const wrapper = isWebGL2 ? new WebGL2RenderingContext() : new WebGLRenderingContext()
+  const wrapper = new ctx.constructor()
 
   let proto = ctx
   while (proto && proto !== Object.prototype) {
@@ -3078,6 +3077,4 @@ for (const [key, value] of Object.entries(gl)) {
 
 class WebGLRenderingContext extends WebGLRenderingContextHelper {}
 
-class WebGL2RenderingContext extends WebGLRenderingContextHelper {}
-
-module.exports = { WebGLRenderingContext, WebGL2RenderingContext, wrapContext }
+module.exports = { WebGLRenderingContextHelper, WebGLRenderingContext, wrapContext }

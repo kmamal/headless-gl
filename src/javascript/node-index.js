@@ -1,6 +1,7 @@
 const bits = require('bit-twiddle')
 const { WebGLContextAttributes } = require('./webgl-context-attributes')
-const { WebGLRenderingContext, WebGL2RenderingContext, wrapContext } = require('./webgl-rendering-context')
+const { WebGLRenderingContext, wrapContext } = require('./webgl-rendering-context')
+const { WebGL2RenderingContext } = require('./webgl2-rendering-context')
 const { WebGLTextureUnit } = require('./webgl-texture-unit')
 const { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } = require('./webgl-vertex-attribute')
 
