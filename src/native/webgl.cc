@@ -459,6 +459,9 @@ void WebGLRenderingContext::dispose() {
     case GLOBJECT_TYPE_SAMPLER:
       glDeleteSamplers(1, &obj);
       break;
+    case GLOBJECT_TYPE_QUERY:
+      glDeleteQueries(1, &obj);
+      break;
     default:
       break;
     }
@@ -3033,12 +3036,14 @@ GL_METHOD(CreateQuery) {
   GL_BOILERPLATE;
   GLuint query;
   glGenQueries(1, &query);
+  inst->registerGLObj(GLOBJECT_TYPE_QUERY, query);
   info.GetReturnValue().Set(Nan::New(query));
 }
 
 GL_METHOD(DeleteQuery) {
   GL_BOILERPLATE;
   GLuint query = Nan::To<uint32_t>(info[0]).ToChecked();
+  inst->unregisterGLObj(GLOBJECT_TYPE_QUERY, query);
   glDeleteQueries(1, &query);
 }
 
@@ -3066,7 +3071,7 @@ GL_METHOD(GetQuery) {
   GL_BOILERPLATE;
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[1]).ToChecked();
-  GLuint result;
+  GLuint result = 0;
   glGetQueryiv(target, pname, reinterpret_cast<GLint *>(&result));
   info.GetReturnValue().Set(Nan::New(result));
 }
@@ -3075,7 +3080,7 @@ GL_METHOD(GetQueryParameter) {
   GL_BOILERPLATE;
   GLuint query = Nan::To<uint32_t>(info[0]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[1]).ToChecked();
-  GLuint result;
+  GLuint result = 0;
   glGetQueryObjectuiv(query, pname, &result);
   info.GetReturnValue().Set(Nan::New(result));
 }

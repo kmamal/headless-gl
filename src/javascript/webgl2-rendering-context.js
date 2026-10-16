@@ -3,6 +3,7 @@ const { WebGLRenderingContextHelper } = require('./webgl-rendering-context')
 const { WebGLProgram } = require('./webgl-program')
 const { WebGLBuffer } = require('./webgl-buffer')
 const { WebGLSampler } = require('./webgl-sampler')
+const { WebGLQuery } = require('./webgl-query')
 const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
@@ -1495,6 +1496,142 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       return null
     }
     return super.getSamplerParameter(sampler._ | 0, pname)
+  }
+
+  _isQueryTarget (target) {
+    return target === this.ANY_SAMPLES_PASSED ||
+      target === this.ANY_SAMPLES_PASSED_CONSERVATIVE ||
+      target === this.TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN
+  }
+
+  createQuery () {
+    const id = super.createQuery()
+    if (id <= 0) return null
+    const query = new WebGLQuery(id, this)
+    this._queries[id] = query
+    return query
+  }
+
+  deleteQuery (query) {
+    if (!checkObject(query)) {
+      throw new TypeError('deleteQuery(WebGLQuery)')
+    }
+
+    if (!query) {
+      return
+    }
+
+    if (!(query instanceof WebGLQuery &&
+      this._checkOwns(query))) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (query._pendingDelete) {
+      return
+    }
+
+    if (query._active) {
+      this.endQuery(query._target)
+    }
+
+    query._pendingDelete = true
+    query._checkDelete()
+  }
+
+  isQuery (object) {
+    if (!this._isObject(object, 'isQuery', WebGLQuery)) return false
+    return super.isQuery(object._ | 0)
+  }
+
+  beginQuery (target, query) {
+    target |= 0
+    if (!query || !checkObject(query)) {
+      throw new TypeError('beginQuery(GLenum, WebGLQuery)')
+    }
+    if (!this._isQueryTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (query instanceof WebGLQuery && query._pendingDelete) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    if (!this._checkWrapper(query, WebGLQuery)) {
+      return
+    }
+    const sibling = target === this.ANY_SAMPLES_PASSED
+      ? this.ANY_SAMPLES_PASSED_CONSERVATIVE
+      : this.ANY_SAMPLES_PASSED
+    if (query._active ||
+      this._activeQueries[target] ||
+      (target !== this.TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN && this._activeQueries[sibling]) ||
+      (query._target && query._target !== target)) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.beginQuery(target, query._ | 0)
+    query._target = target
+    query._active = true
+    query._refCount += 1
+    this._activeQueries[target] = query
+  }
+
+  endQuery (target) {
+    target |= 0
+    if (!this._isQueryTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    const query = this._activeQueries[target]
+    if (!query) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.endQuery(target)
+    query._active = false
+    query._resultPending = true
+    setImmediate(function () {
+      query._resultPending = false
+    })
+    query._refCount -= 1
+    query._checkDelete()
+    this._activeQueries[target] = null
+  }
+
+  getQuery (target, pname) {
+    target |= 0
+    pname |= 0
+    if (!this._isQueryTarget(target) || pname !== this.CURRENT_QUERY) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    return this._activeQueries[target] || null
+  }
+
+  getQueryParameter (query, pname) {
+    pname |= 0
+    if (!query || !checkObject(query)) {
+      throw new TypeError('getQueryParameter(WebGLQuery, GLenum)')
+    }
+    if (!this._checkWrapper(query, WebGLQuery)) {
+      return null
+    }
+    if (pname !== this.QUERY_RESULT && pname !== this.QUERY_RESULT_AVAILABLE) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    if (query._active || !query._target) {
+      this.setError(this.INVALID_OPERATION)
+      return null
+    }
+    if (pname === this.QUERY_RESULT_AVAILABLE) {
+      if (query._resultPending) {
+        return false
+      }
+      return super.getQueryParameter(query._ | 0, pname) !== 0
+    }
+    return super.getQueryParameter(query._ | 0, pname)
   }
 
   getUniformLocation (program, name) {
