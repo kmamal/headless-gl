@@ -26,6 +26,12 @@ tape('uniform array names', function (t) {
   t.equal(gl.getError(), gl.NO_ERROR)
   t.deepEqual(Array.from(gl.getUniform(program, gl.getUniformLocation(program, 'pairs[1]'))), [3, 4])
 
+  gl.uniform1fv(gl.getUniformLocation(program, 'arr[2]'), [7, 8])
+  t.equal(gl.getError(), gl.NO_ERROR, 'an element location sets the rest of the array')
+  t.equal(gl.getUniform(program, gl.getUniformLocation(program, 'arr[1]')), 2)
+  t.equal(gl.getUniform(program, gl.getUniformLocation(program, 'arr[2]')), 7)
+  t.equal(gl.getUniform(program, gl.getUniformLocation(program, 'arr[3]')), 8)
+
   t.equal(gl.getUniformLocation(program, 'arr[4]'), null, 'index past the end')
   t.equal(gl.getUniformLocation(program, 'arr]'), null, 'malformed name')
   t.equal(gl.getUniformLocation(program, 'missing'), null, 'unknown name')

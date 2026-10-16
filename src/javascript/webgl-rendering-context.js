@@ -1992,16 +1992,17 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           info)
 
         // handle array case
-        if (implicitArray || /\[0\]$/.test(name)) {
-          const baseName = name.replace(/\[0\]$/, '')
+        const element = /\[(\d+)\]$/.exec(name)
+        if (implicitArray || element) {
+          const offset = element ? +element[1] : 0
+          if (offset >= info.size) {
+            return null
+          }
+          const baseName = name.replace(/\[\d+\]$/, '')
           const arrayLocs = []
 
-          // if (offset < 0 || offset >= info.size) {
-          //   return null
-          // }
-
           this._saveError()
-          for (let i = 0; this.getError() === this.NO_ERROR; ++i) {
+          for (let i = offset; this.getError() === this.NO_ERROR; ++i) {
             const xloc = super.getUniformLocation(
               program._ | 0,
               baseName + '[' + i + ']')
@@ -2013,11 +2014,6 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           this._restoreError(this.NO_ERROR)
 
           result._array = arrayLocs
-        } else if (/\[(\d+)\]$/.test(name)) {
-          const offset = +(/\[(\d+)\]$/.exec(name))[1]
-          if (offset < 0 || offset >= info.size) {
-            return null
-          }
         }
         return result
       }
