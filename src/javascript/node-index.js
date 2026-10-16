@@ -83,6 +83,7 @@ function createContext (width, height, options) {
   if (contextAttributes.createWebGL2Context) {
     ctx._vaos = {}
     ctx._activeVertexArrayObject = null
+    ctx._samplers = {}
     ctx._indexedBufferBindings[ctx.UNIFORM_BUFFER] =
       new Array(ctx.getParameter(ctx.MAX_UNIFORM_BUFFER_BINDINGS)).fill(null)
     ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] =

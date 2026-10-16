@@ -8,6 +8,7 @@ class WebGLTextureUnit {
     if (ctx._isWebGL2()) {
       this._bind2DArray = null
       this._bind3D = null
+      this._sampler = null
     }
   }
 }

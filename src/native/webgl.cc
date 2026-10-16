@@ -456,6 +456,9 @@ void WebGLRenderingContext::dispose() {
     case GLOBJECT_TYPE_VERTEX_ARRAY:
       glDeleteVertexArraysOES(1, &obj);
       break;
+    case GLOBJECT_TYPE_SAMPLER:
+      glDeleteSamplers(1, &obj);
+      break;
     default:
       break;
     }
@@ -3081,12 +3084,14 @@ GL_METHOD(CreateSampler) {
   GL_BOILERPLATE;
   GLuint sampler;
   glGenSamplers(1, &sampler);
+  inst->registerGLObj(GLOBJECT_TYPE_SAMPLER, sampler);
   info.GetReturnValue().Set(Nan::New(sampler));
 }
 
 GL_METHOD(DeleteSampler) {
   GL_BOILERPLATE;
   GLuint sampler = Nan::To<uint32_t>(info[0]).ToChecked();
+  inst->unregisterGLObj(GLOBJECT_TYPE_SAMPLER, sampler);
   glDeleteSamplers(1, &sampler);
 }
 
@@ -3124,7 +3129,14 @@ GL_METHOD(GetSamplerParameter) {
   GL_BOILERPLATE;
   GLuint sampler = Nan::To<uint32_t>(info[0]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[1]).ToChecked();
-  GLint result;
+  if (pname == GL_TEXTURE_MIN_LOD || pname == GL_TEXTURE_MAX_LOD ||
+      pname == GL_TEXTURE_MAX_ANISOTROPY_EXT) {
+    GLfloat result = 0;
+    glGetSamplerParameterfv(sampler, pname, &result);
+    info.GetReturnValue().Set(Nan::New<v8::Number>(result));
+    return;
+  }
+  GLint result = 0;
   glGetSamplerParameteriv(sampler, pname, &result);
   info.GetReturnValue().Set(Nan::New(result));
 }

@@ -2,6 +2,7 @@ const { gl } = require('./native-gl')
 const { WebGLRenderingContextHelper } = require('./webgl-rendering-context')
 const { WebGLProgram } = require('./webgl-program')
 const { WebGLBuffer } = require('./webgl-buffer')
+const { WebGLSampler } = require('./webgl-sampler')
 const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
@@ -1076,6 +1077,9 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     if (pname === this.TEXTURE_BINDING_2D_ARRAY) {
       return this._getActiveTextureUnit()._bind2DArray
     }
+    if (pname === this.SAMPLER_BINDING) {
+      return this._getActiveTextureUnit()._sampler
+    }
     if (pname === this.READ_BUFFER) {
       const framebuffer = this._activeFramebuffers.read
       return framebuffer ? framebuffer._readBuffer : this._defaultReadBuffer
@@ -1349,6 +1353,148 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       return pname === this.TEXTURE_IMMUTABLE_FORMAT ? value !== 0 : value
     }
     return super.getTexParameter(target, pname)
+  }
+
+  _isSamplerParameter (pname) {
+    if (this._extensions.ext_texture_filter_anisotropic &&
+      pname === this._extensions.ext_texture_filter_anisotropic.TEXTURE_MAX_ANISOTROPY_EXT) {
+      return true
+    }
+    return pname === this.TEXTURE_MIN_FILTER ||
+      pname === this.TEXTURE_MAG_FILTER ||
+      pname === this.TEXTURE_WRAP_S ||
+      pname === this.TEXTURE_WRAP_T ||
+      pname === this.TEXTURE_WRAP_R ||
+      pname === this.TEXTURE_MIN_LOD ||
+      pname === this.TEXTURE_MAX_LOD ||
+      pname === this.TEXTURE_COMPARE_MODE ||
+      pname === this.TEXTURE_COMPARE_FUNC
+  }
+
+  createSampler () {
+    const id = super.createSampler()
+    if (id <= 0) return null
+    const sampler = new WebGLSampler(id, this)
+    this._samplers[id] = sampler
+    return sampler
+  }
+
+  deleteSampler (sampler) {
+    if (!checkObject(sampler)) {
+      throw new TypeError('deleteSampler(WebGLSampler)')
+    }
+
+    if (!sampler) {
+      return
+    }
+
+    if (!(sampler instanceof WebGLSampler &&
+      this._checkOwns(sampler))) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (sampler._pendingDelete) {
+      return
+    }
+
+    for (let i = 0; i < this._textureUnits.length; ++i) {
+      if (this._textureUnits[i]._sampler === sampler) {
+        this.bindSampler(i, null)
+      }
+    }
+
+    sampler._pendingDelete = true
+    sampler._checkDelete()
+  }
+
+  isSampler (object) {
+    if (!this._isObject(object, 'isSampler', WebGLSampler)) return false
+    return super.isSampler(object._ | 0)
+  }
+
+  bindSampler (unit, sampler) {
+    unit |= 0
+    if (!checkObject(sampler)) {
+      throw new TypeError('bindSampler(GLuint, WebGLSampler)')
+    }
+
+    if (unit < 0 || unit >= this._textureUnits.length) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if (!sampler) {
+      sampler = null
+      super.bindSampler(unit, 0)
+    } else if (sampler instanceof WebGLSampler && sampler._pendingDelete) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    } else if (this._checkWrapper(sampler, WebGLSampler)) {
+      super.bindSampler(unit, sampler._ | 0)
+    } else {
+      return
+    }
+
+    const textureUnit = this._textureUnits[unit]
+    const active = textureUnit._sampler
+    if (active !== sampler) {
+      if (active) {
+        active._refCount -= 1
+        active._checkDelete()
+      }
+      if (sampler) {
+        sampler._refCount += 1
+      }
+    }
+    textureUnit._sampler = sampler
+  }
+
+  samplerParameteri (sampler, pname, param) {
+    pname |= 0
+    param |= 0
+    if (!sampler || !checkObject(sampler)) {
+      throw new TypeError('samplerParameteri(WebGLSampler, GLenum, GLint)')
+    }
+    if (!this._checkWrapper(sampler, WebGLSampler)) {
+      return
+    }
+    if (!this._isSamplerParameter(pname)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    super.samplerParameteri(sampler._ | 0, pname, param)
+  }
+
+  samplerParameterf (sampler, pname, param) {
+    pname |= 0
+    param = +param
+    if (!sampler || !checkObject(sampler)) {
+      throw new TypeError('samplerParameterf(WebGLSampler, GLenum, GLfloat)')
+    }
+    if (!this._checkWrapper(sampler, WebGLSampler)) {
+      return
+    }
+    if (!this._isSamplerParameter(pname)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    super.samplerParameterf(sampler._ | 0, pname, param)
+  }
+
+  getSamplerParameter (sampler, pname) {
+    pname |= 0
+    if (!sampler || !checkObject(sampler)) {
+      throw new TypeError('getSamplerParameter(WebGLSampler, GLenum)')
+    }
+    if (!this._checkWrapper(sampler, WebGLSampler)) {
+      return null
+    }
+    if (!this._isSamplerParameter(pname)) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+    return super.getSamplerParameter(sampler._ | 0, pname)
   }
 
   getUniformLocation (program, name) {
