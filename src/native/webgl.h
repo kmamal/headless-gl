@@ -37,6 +37,8 @@ enum GLContextState {
 
 bool CaseInsensitiveCompare(const std::string &a, const std::string &b);
 
+enum UnpackStatus { UNPACK_OK, UNPACK_PASSTHROUGH, UNPACK_TOO_SMALL };
+
 using GLObjectReference = std::pair<GLuint, GLObjectType>;
 using WebGLToANGLEExtensionsMap =
     std::map<std::string, std::vector<std::string>, decltype(&CaseInsensitiveCompare)>;
@@ -59,6 +61,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   bool unpack_premultiply_alpha;
   GLint unpack_colorspace_conversion;
   GLint unpack_alignment;
+  bool isWebGL2;
 
   std::set<std::string> requestableExtensions;
   std::set<std::string> enabledExtensions;
@@ -106,8 +109,9 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   bool setActive();
 
   // Unpacks a buffer full of pixels into memory
-  std::vector<uint8_t> unpackPixels(GLenum type, GLenum format, GLint width, GLint height,
-                                    unsigned char *pixels);
+  UnpackStatus unpackPixels(GLenum type, GLenum format, GLint width, GLint height,
+                            const unsigned char *pixels, size_t length,
+                            std::vector<uint8_t> &unpacked);
 
   // Error handling
   std::set<GLenum> errorSet;

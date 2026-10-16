@@ -21,7 +21,7 @@ const {
   typeSize,
   uniformTypeSize,
   extractImageData,
-  convertPixelFormats,
+  packImageSource,
   isTypedArray,
   unpackTypedArray,
   convertPixels,
@@ -900,6 +900,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     } else if (texture instanceof WebGLTexture &&
       texture._pendingDelete) {
       // Special case: error codes for deleted textures don't get set for some dumb reason
+      if (this._isWebGL2()) {
+        this.setError(this.INVALID_OPERATION)
+      }
       return
     } else if (this._checkWrapper(texture, WebGLTexture)) {
       texture._binding = target
@@ -1582,11 +1585,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       } else if (unit._bindCube === texture) {
         this.activeTexture(this.TEXTURE0 + i)
         this.bindTexture(this.TEXTURE_CUBE_MAP, null)
-      } else if (this._isWebGL2() && unit._bind2DArray === texture) {
-        this.activeTexture(this.TEXTURE_2D_ARRAY)
+      }
+      if (this._isWebGL2() && unit._bind2DArray === texture) {
+        this.activeTexture(this.TEXTURE0 + i)
         this.bindTexture(this.TEXTURE_2D_ARRAY, null)
-      } else if (this._isWebGL2() && unit._bind3D === texture) {
-        this.activeTexture(this.TEXTURE_3D)
+      }
+      if (this._isWebGL2() && unit._bind3D === texture) {
+        this.activeTexture(this.TEXTURE0 + i)
         this.bindTexture(this.TEXTURE_3D, null)
       }
     }
@@ -2666,22 +2671,20 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     format,
     type,
     pixels) {
+    let image = null
     if (arguments.length === 6) {
-      pixels = border
-      type = height
-      format = width
+      image = extractImageData(border)
 
-      pixels = extractImageData(pixels)
-
-      if (pixels == null) {
+      if (image == null) {
         throw new TypeError('texImage2D(GLenum, GLint, GLenum, GLint, GLenum, GLenum, ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement)')
       }
 
-      width = pixels.width
-      height = pixels.height
-      pixels = pixels.data
-
-      pixels = convertPixelFormats(this, pixels, this.RGBA, format)
+      type = height
+      format = width
+      width = image.width
+      height = image.height
+      border = 0
+      pixels = image
     }
 
     target |= 0
@@ -2698,6 +2701,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     if (!this._checkPixelBufferArgument(pixels, this.PIXEL_UNPACK_BUFFER)) { return }
 
+    if (!image) { image = this._imageSource(pixels, 'texImage2D') }
+    if (image) {
+      pixels = this._imageSourcePixels(image, format, type, width, height, 1)
+      if (pixels === false) { return }
+    }
+
     // Note: there's an ANGLE bug where it doesn't check for setting texImage2D on texture zero in WebGL compat.
     if (this._getActiveTextureForImage(target) === null) {
       if (target === this.TEXTURE_2D || validCubeTarget(target)) {
@@ -2710,7 +2719,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
     // Need to check for out of memory error
     this._saveError()
-    super.texImage2D(
+    this._withImageUnpack(image, () => super.texImage2D(
       target,
       level,
       internalFormat,
@@ -2719,7 +2728,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       border,
       format,
       type,
-      data)
+      data))
     const error = this.getError()
     this._restoreError(error)
     if (error === this.NO_ERROR) {
@@ -2739,22 +2748,19 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     format,
     type,
     pixels) {
+    let image = null
     if (arguments.length === 7) {
-      pixels = format
-      type = height
-      format = width
+      image = extractImageData(format)
 
-      pixels = extractImageData(pixels)
-
-      if (pixels == null) {
+      if (image == null) {
         throw new TypeError('texSubImage2D(GLenum, GLint, GLint, GLint, GLenum, GLenum, ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement)')
       }
 
-      width = pixels.width
-      height = pixels.height
-      pixels = pixels.data
-
-      pixels = convertPixelFormats(this, pixels, this.RGBA, format)
+      type = height
+      format = width
+      width = image.width
+      height = image.height
+      pixels = image
     }
 
     if (typeof pixels !== 'object' && !this._isPixelBufferOffset(pixels)) {
@@ -2762,9 +2768,15 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     if (!this._checkPixelBufferArgument(pixels, this.PIXEL_UNPACK_BUFFER)) { return }
 
+    if (!image) { image = this._imageSource(pixels, 'texSubImage2D') }
+    if (image) {
+      pixels = this._imageSourcePixels(image, format | 0, type | 0, width | 0, height | 0, 1)
+      if (pixels === false) { return }
+    }
+
     const data = typeof pixels === 'number' ? pixels : convertPixels(pixels)
 
-    super.texSubImage2D(
+    this._withImageUnpack(image, () => super.texSubImage2D(
       target,
       level,
       xoffset,
@@ -2773,11 +2785,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       height,
       format,
       type,
-      data)
+      data))
   }
 
   texSubImage3D (target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels) {
     if (pixels === null || pixels === undefined) {
+      this.setError(this.INVALID_VALUE)
       return
     }
 
@@ -2785,13 +2798,6 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new TypeError('texSubImage3D(GLenum, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLenum, GLenum, Uint8Array)')
     }
 
-    if (
-      typeof pixels.width !== 'undefined' &&
-      typeof pixels.height !== 'undefined'
-    ) {
-      pixels = extractImageData(pixels).data
-      pixels = convertPixelFormats(this, pixels, this.RGBA, format)
-    }
     const data = convertPixels(pixels)
 
     super.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, data)
@@ -2946,6 +2952,84 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   isContextLost () {
     return false
+  }
+
+  _imageSource (pixels, name) {
+    if (pixels === null || typeof pixels !== 'object' || ArrayBuffer.isView(pixels) || pixels instanceof ArrayBuffer) {
+      return null
+    }
+    if (!this._isWebGL2()) {
+      throw new TypeError(`${name}(..., ArrayBufferView | null)`)
+    }
+    const image = extractImageData(pixels)
+    if (image == null) {
+      throw new TypeError(`${name}(..., ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement)`)
+    }
+    return image
+  }
+
+  _imageSourcePixels (image, format, type, width, height, depth, is3D) {
+    if (width < 0 || height < 0) {
+      this.setError(this.INVALID_VALUE)
+      return false
+    }
+    let x = 0
+    let y = 0
+    let imageHeight = height
+    if (this._isWebGL2()) {
+      x = super.getParameter(this.UNPACK_SKIP_PIXELS)
+      y = super.getParameter(this.UNPACK_SKIP_ROWS)
+    }
+    if (is3D) {
+      imageHeight = super.getParameter(this.UNPACK_IMAGE_HEIGHT) || height
+      if (y + height > imageHeight) {
+        this.setError(this.INVALID_OPERATION)
+        return false
+      }
+      y += super.getParameter(this.UNPACK_SKIP_IMAGES) * imageHeight
+    }
+    if (depth < 1 || x + width > image.width || y + (depth - 1) * imageHeight + height > image.height) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    const pixels = packImageSource(
+      image,
+      { x, y, width, height, depth, imageHeight },
+      format,
+      type,
+      super.getParameter(this.UNPACK_FLIP_Y_WEBGL),
+      super.getParameter(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL))
+    if (!pixels) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    return pixels
+  }
+
+  _withImageUnpack (image, upload) {
+    if (!image) {
+      return upload()
+    }
+    const params = [
+      [this.UNPACK_ALIGNMENT, 1],
+      [this.UNPACK_FLIP_Y_WEBGL, 0],
+      [this.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0]
+    ]
+    if (this._isWebGL2()) {
+      params.push(
+        [this.UNPACK_ROW_LENGTH, 0],
+        [this.UNPACK_SKIP_PIXELS, 0],
+        [this.UNPACK_SKIP_ROWS, 0],
+        [this.UNPACK_IMAGE_HEIGHT, 0],
+        [this.UNPACK_SKIP_IMAGES, 0])
+    }
+    const saved = params.map(([pname]) => super.getParameter(pname))
+    for (const [pname, value] of params) { super.pixelStorei(pname, value) }
+    try {
+      return upload()
+    } finally {
+      params.forEach(([pname], i) => super.pixelStorei(pname, +saved[i]))
+    }
   }
 
   compressedTexImage2D () {

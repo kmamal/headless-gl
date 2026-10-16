@@ -1006,8 +1006,57 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     return { type, object }
   }
 
+  _checkPixelType (type, view) {
+    if (!ArrayBuffer.isView(view)) {
+      return true
+    }
+    let valid
+    switch (type) {
+      case this.UNSIGNED_BYTE:
+        valid = view instanceof Uint8Array || view instanceof Uint8ClampedArray
+        break
+      case this.BYTE:
+        valid = view instanceof Int8Array
+        break
+      case this.UNSIGNED_SHORT:
+      case this.UNSIGNED_SHORT_5_6_5:
+      case this.UNSIGNED_SHORT_4_4_4_4:
+      case this.UNSIGNED_SHORT_5_5_5_1:
+      case this.HALF_FLOAT:
+        valid = view instanceof Uint16Array
+        break
+      case this.SHORT:
+        valid = view instanceof Int16Array
+        break
+      case this.UNSIGNED_INT:
+      case this.UNSIGNED_INT_2_10_10_10_REV:
+      case this.UNSIGNED_INT_10F_11F_11F_REV:
+      case this.UNSIGNED_INT_5_9_9_9_REV:
+      case this.UNSIGNED_INT_24_8:
+        valid = view instanceof Uint32Array
+        break
+      case this.INT:
+        valid = view instanceof Int32Array
+        break
+      case this.FLOAT:
+        valid = view instanceof Float32Array
+        break
+      case this.FLOAT_32_UNSIGNED_INT_24_8_REV:
+        valid = false
+        break
+      default:
+        return true
+    }
+    if (!valid) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    return true
+  }
+
   readPixels (x, y, width, height, format, type, pixels, dstOffset) {
     if (ArrayBuffer.isView(pixels)) {
+      if (!this._checkPixelType(type | 0, pixels)) return
       if (arguments.length > 7) {
         pixels = this._sliceSource(pixels, dstOffset, 0, 'readPixels')
         if (!pixels) return
@@ -1020,6 +1069,12 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     pname |= 0
     if (pname === this.VERTEX_ARRAY_BINDING) {
       return this._activeVertexArrayObject
+    }
+    if (pname === this.TEXTURE_BINDING_3D) {
+      return this._getActiveTextureUnit()._bind3D
+    }
+    if (pname === this.TEXTURE_BINDING_2D_ARRAY) {
+      return this._getActiveTextureUnit()._bind2DArray
     }
     if (pname === this.READ_BUFFER) {
       const framebuffer = this._activeFramebuffers.read
@@ -1038,6 +1093,262 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       return drawBuffer === 0 ? this._defaultDrawBuffer : this.NONE
     }
     return super.getParameter(pname)
+  }
+
+  _isWebGL2TexParameter (pname) {
+    return pname === this.TEXTURE_BASE_LEVEL ||
+      pname === this.TEXTURE_COMPARE_FUNC ||
+      pname === this.TEXTURE_COMPARE_MODE ||
+      pname === this.TEXTURE_MAX_LEVEL ||
+      pname === this.TEXTURE_MAX_LOD ||
+      pname === this.TEXTURE_MIN_LOD ||
+      pname === this.TEXTURE_WRAP_R
+  }
+
+  _unpackParametersUnsupported () {
+    if (gl.getParameter.call(this, this.UNPACK_FLIP_Y_WEBGL) ||
+      gl.getParameter.call(this, this.UNPACK_PREMULTIPLY_ALPHA_WEBGL)) {
+      this.setError(this.INVALID_OPERATION)
+      return true
+    }
+    return false
+  }
+
+  _checkTexStorage (target, levels, width, height, depth, allowed) {
+    if (allowed.indexOf(target) < 0) {
+      this.setError(this.INVALID_ENUM)
+      return false
+    }
+    if (!this._getActiveTexture(target)) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    if (levels < 1 || width < 1 || height < 1 || depth < 1) {
+      this.setError(this.INVALID_VALUE)
+      return false
+    }
+    const maxLevels = Math.floor(Math.log2(Math.max(width, height, target === this.TEXTURE_3D ? depth : 1))) + 1
+    if (levels > maxLevels) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    return true
+  }
+
+  texStorage2D (target, levels, internalFormat, width, height) {
+    target |= 0
+    levels |= 0
+    internalFormat |= 0
+    width |= 0
+    height |= 0
+
+    if (!this._checkTexStorage(target, levels, width, height, 1, [this.TEXTURE_2D, this.TEXTURE_CUBE_MAP])) {
+      return
+    }
+
+    this._saveError()
+    super.texStorage2D(target, levels, internalFormat, width, height)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      const texture = this._getActiveTexture(target)
+      texture._format = internalFormat
+      texture._type = 0
+    }
+  }
+
+  texStorage3D (target, levels, internalFormat, width, height, depth) {
+    target |= 0
+    levels |= 0
+    internalFormat |= 0
+    width |= 0
+    height |= 0
+    depth |= 0
+
+    if (!this._checkTexStorage(target, levels, width, height, depth, [this.TEXTURE_3D, this.TEXTURE_2D_ARRAY])) {
+      return
+    }
+
+    this._saveError()
+    super.texStorage3D(target, levels, internalFormat, width, height, depth)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      const texture = this._getActiveTexture(target)
+      texture._format = internalFormat
+      texture._type = 0
+    }
+  }
+
+  texImage2D (target, level, internalFormat, width, height, border, format, type, source, srcOffset) {
+    if (arguments.length >= 9 && !this._checkPixelType(type | 0, source)) return
+    if (arguments.length === 10) {
+      if (!ArrayBuffer.isView(source)) {
+        throw new TypeError('texImage2D(GLenum, GLint, GLenum, GLint, GLint, GLint, GLenum, GLenum, ArrayBufferView, GLuint)')
+      }
+      source = this._sliceSource(source, srcOffset, 0, 'texImage2D', this.INVALID_OPERATION)
+      if (!source) return
+      return super.texImage2D(target, level, internalFormat, width, height, border, format, type, source)
+    }
+    return super.texImage2D.apply(this, arguments)
+  }
+
+  texSubImage2D (target, level, xoffset, yoffset, width, height, format, type, source, srcOffset) {
+    if (arguments.length >= 9 && !this._checkPixelType(type | 0, source)) return
+    if (arguments.length === 10) {
+      if (!ArrayBuffer.isView(source)) {
+        throw new TypeError('texSubImage2D(GLenum, GLint, GLint, GLint, GLint, GLint, GLenum, GLenum, ArrayBufferView, GLuint)')
+      }
+      source = this._sliceSource(source, srcOffset, 0, 'texSubImage2D', this.INVALID_OPERATION)
+      if (!source) return
+      return super.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, source)
+    }
+    return super.texSubImage2D.apply(this, arguments)
+  }
+
+  texImage3D (target, level, internalFormat, width, height, depth, border, format, type, source, srcOffset) {
+    target |= 0
+    level |= 0
+    internalFormat |= 0
+    width |= 0
+    height |= 0
+    depth |= 0
+    border |= 0
+    format |= 0
+    type |= 0
+
+    if (source !== null && source !== undefined && typeof source !== 'number' && (typeof source !== 'object' || source instanceof ArrayBuffer)) {
+      throw new TypeError('texImage3D(GLenum, GLint, GLint, GLsizei, GLsizei, GLsizei, GLint, GLenum, GLenum, ArrayBufferView)')
+    }
+    if (!this._checkPixelBufferArgument(source, this.PIXEL_UNPACK_BUFFER)) return
+    const image = this._imageSource(source, 'texImage3D')
+
+    if (target !== this.TEXTURE_3D && target !== this.TEXTURE_2D_ARRAY) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    const texture = this._getActiveTexture(target)
+    if (!texture) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (image) {
+      source = this._imageSourcePixels(image, format, type, width, height, depth, true)
+      if (source === false) return
+    } else if (ArrayBuffer.isView(source)) {
+      if (!this._checkPixelType(type, source)) return
+      if (this._unpackParametersUnsupported()) return
+      if (arguments.length > 10) {
+        source = this._sliceSource(source, srcOffset, 0, 'texImage3D', this.INVALID_OPERATION)
+        if (!source) return
+      }
+    } else if (typeof source === 'number') {
+      if (this._unpackParametersUnsupported()) return
+    } else if (source === undefined) {
+      source = null
+    }
+
+    this._saveError()
+    this._withImageUnpack(image, () => super.texImage3D(target, level, internalFormat, width, height, depth, border, format, type, source))
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      texture._format = format
+      texture._type = type
+    }
+  }
+
+  texSubImage3D (target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, source, srcOffset) {
+    if (source instanceof ArrayBuffer) {
+      throw new TypeError('texSubImage3D(GLenum, GLint, GLint, GLint, GLint, GLsizei, GLsizei, GLsizei, GLenum, GLenum, ArrayBufferView)')
+    }
+    if (!this._checkPixelBufferArgument(source, this.PIXEL_UNPACK_BUFFER)) return
+    const image = this._imageSource(source, 'texSubImage3D')
+    if (image) {
+      const pixels = this._imageSourcePixels(image, format | 0, type | 0, width | 0, height | 0, depth | 0, true)
+      if (pixels === false) return
+      this._withImageUnpack(image, () => gl.texSubImage3D.call(this, target | 0, level | 0, xoffset | 0, yoffset | 0,
+        zoffset | 0, width | 0, height | 0, depth | 0, format | 0, type | 0, new Uint8Array(pixels.buffer)))
+      return
+    }
+    if (typeof source === 'number') {
+      if (this._unpackParametersUnsupported()) return
+      gl.texSubImage3D.call(this, target | 0, level | 0, xoffset | 0, yoffset | 0, zoffset | 0,
+        width | 0, height | 0, depth | 0, format | 0, type | 0, source)
+      return
+    }
+    if (ArrayBuffer.isView(source)) {
+      if (!this._checkPixelType(type | 0, source)) return
+      if (this._unpackParametersUnsupported()) return
+      if (arguments.length > 11) {
+        source = this._sliceSource(source, srcOffset, 0, 'texSubImage3D', this.INVALID_OPERATION)
+        if (!source) return
+      }
+    }
+    return super.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, source)
+  }
+
+  copyTexSubImage3D (target, level, xoffset, yoffset, zoffset, x, y, width, height) {
+    target |= 0
+    if (target !== this.TEXTURE_3D && target !== this.TEXTURE_2D_ARRAY) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (!this._getActiveTexture(target)) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    return super.copyTexSubImage3D(target, level | 0, xoffset | 0, yoffset | 0, zoffset | 0,
+      x | 0, y | 0, width | 0, height | 0)
+  }
+
+  _isTexParameter (pname) {
+    if (pname === this.TEXTURE_MAG_FILTER ||
+      pname === this.TEXTURE_MIN_FILTER ||
+      pname === this.TEXTURE_WRAP_S ||
+      pname === this.TEXTURE_WRAP_T ||
+      this._isWebGL2TexParameter(pname)) {
+      return true
+    }
+    return Boolean(this._extensions.ext_texture_filter_anisotropic) &&
+      pname === this._extensions.ext_texture_filter_anisotropic.TEXTURE_MAX_ANISOTROPY_EXT
+  }
+
+  texParameteri (target, pname, param) {
+    if (!this._isTexParameter(pname | 0)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (this._isWebGL2TexParameter(pname | 0)) {
+      if (!this._checkTextureTarget(target | 0)) return
+      return gl.texParameteri.call(this, target | 0, pname | 0, param | 0)
+    }
+    return super.texParameteri(target, pname, param)
+  }
+
+  texParameterf (target, pname, param) {
+    if (!this._isTexParameter(pname | 0)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (this._isWebGL2TexParameter(pname | 0)) {
+      if (!this._checkTextureTarget(target | 0)) return
+      return gl.texParameterf.call(this, target | 0, pname | 0, +param)
+    }
+    return super.texParameterf(target, pname, param)
+  }
+
+  getTexParameter (target, pname) {
+    pname |= 0
+    if (this._isWebGL2TexParameter(pname) ||
+      pname === this.TEXTURE_IMMUTABLE_FORMAT ||
+      pname === this.TEXTURE_IMMUTABLE_LEVELS) {
+      if (!this._checkTextureTarget(target | 0)) return null
+      const value = gl.getTexParameter.call(this, target | 0, pname)
+      return pname === this.TEXTURE_IMMUTABLE_FORMAT ? value !== 0 : value
+    }
+    return super.getTexParameter(target, pname)
   }
 
   getUniformLocation (program, name) {

@@ -1,7 +1,9 @@
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <vector>
 
@@ -205,7 +207,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                                              bool failIfMajorPerformanceCaveat,
                                              bool createWebGL2Context)
     : state(GLCONTEXT_STATE_INIT), unpack_flip_y(false), unpack_premultiply_alpha(false),
-      unpack_colorspace_conversion(0x9244), unpack_alignment(4),
+      unpack_colorspace_conversion(0x9244), unpack_alignment(4), isWebGL2(createWebGL2Context),
       webGLToANGLEExtensions(&CaseInsensitiveCompare), next(NULL), prev(NULL) {
 
   // Uncomment on Windows to attach debugger
@@ -964,95 +966,228 @@ GL_METHOD(BindTexture) {
   glBindTexture(target, texture);
 }
 
-std::vector<uint8_t> WebGLRenderingContext::unpackPixels(GLenum type, GLenum format, GLint width,
-                                                         GLint height, unsigned char *pixels) {
+static const unsigned char EMPTY_PIXEL = 0;
+static const GLenum HALF_FLOAT_OES = 0x8D61;
 
-  // Compute pixel size
-  GLint pixelSize = 1;
-  if (type == GL_UNSIGNED_BYTE || type == GL_FLOAT) {
-    if (type == GL_FLOAT) {
-      pixelSize = 4;
-    }
-    switch (format) {
-    case GL_ALPHA:
-    case GL_LUMINANCE:
-      break;
-    case GL_LUMINANCE_ALPHA:
-      pixelSize *= 2;
-      break;
-    case GL_RGB:
-      pixelSize *= 3;
-      break;
-    case GL_RGBA:
-      pixelSize *= 4;
-      break;
-    }
+static GLint BytesPerPixel(GLenum type, GLenum format) {
+  GLint bytesPerComponent = 0;
+  switch (type) {
+  case GL_UNSIGNED_BYTE:
+  case GL_BYTE:
+    bytesPerComponent = 1;
+    break;
+  case GL_UNSIGNED_SHORT:
+  case GL_SHORT:
+  case GL_HALF_FLOAT:
+  case HALF_FLOAT_OES:
+    bytesPerComponent = 2;
+    break;
+  case GL_UNSIGNED_INT:
+  case GL_INT:
+  case GL_FLOAT:
+    bytesPerComponent = 4;
+    break;
+  case GL_UNSIGNED_SHORT_5_6_5:
+  case GL_UNSIGNED_SHORT_4_4_4_4:
+  case GL_UNSIGNED_SHORT_5_5_5_1:
+    return 2;
+  case GL_UNSIGNED_INT_2_10_10_10_REV:
+  case GL_UNSIGNED_INT_10F_11F_11F_REV:
+  case GL_UNSIGNED_INT_5_9_9_9_REV:
+  case GL_UNSIGNED_INT_24_8:
+    return 4;
+  case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+    return 8;
+  default:
+    return 0;
+  }
+  switch (format) {
+  case GL_ALPHA:
+  case GL_LUMINANCE:
+  case GL_RED:
+  case GL_RED_INTEGER:
+  case GL_DEPTH_COMPONENT:
+    return bytesPerComponent;
+  case GL_LUMINANCE_ALPHA:
+  case GL_RG:
+  case GL_RG_INTEGER:
+    return bytesPerComponent * 2;
+  case GL_RGB:
+  case GL_RGB_INTEGER:
+    return bytesPerComponent * 3;
+  case GL_RGBA:
+  case GL_RGBA_INTEGER:
+    return bytesPerComponent * 4;
+  default:
+    return 0;
+  }
+}
+
+static float HalfToFloat(uint16_t half) {
+  uint32_t sign = (half >> 15) & 1;
+  int32_t exponent = (half >> 10) & 0x1f;
+  uint32_t mantissa = half & 0x3ff;
+  float value;
+  if (exponent == 0) {
+    value = std::ldexp(static_cast<float>(mantissa), -24);
+  } else if (exponent == 31) {
+    value = mantissa ? std::numeric_limits<float>::quiet_NaN()
+                     : std::numeric_limits<float>::infinity();
   } else {
-    pixelSize = 2;
+    value = std::ldexp(static_cast<float>(mantissa | 0x400), exponent - 25);
+  }
+  return sign ? -value : value;
+}
+
+static uint16_t FloatToHalf(float value) {
+  uint32_t bits;
+  memcpy(&bits, &value, 4);
+  uint16_t sign = static_cast<uint16_t>((bits >> 16) & 0x8000);
+  if (std::isnan(value)) {
+    return sign | 0x7e00;
+  }
+  float magnitude = std::fabs(value);
+  if (magnitude >= 65520.0f) {
+    return sign | 0x7c00;
+  }
+  if (magnitude < std::ldexp(1.0f, -14)) {
+    return sign | static_cast<uint16_t>(std::lrint(magnitude * std::ldexp(1.0f, 24)));
+  }
+  int exponent;
+  float fraction = std::frexp(magnitude, &exponent);
+  uint32_t mantissa = static_cast<uint32_t>(std::lrint((fraction * 2.0f - 1.0f) * 1024.0f));
+  uint32_t biased = static_cast<uint32_t>(exponent - 1 + 15);
+  if (mantissa == 1024) {
+    mantissa = 0;
+    biased += 1;
+  }
+  return sign | static_cast<uint16_t>((biased << 10) | mantissa);
+}
+
+static void PremultiplyPixel(uint8_t *pixel, GLenum type, GLenum format) {
+  if (type == GL_UNSIGNED_BYTE) {
+    if (format == GL_LUMINANCE_ALPHA) {
+      pixel[0] = static_cast<uint8_t>(pixel[0] * (pixel[1] / 255.0f));
+    } else {
+      float scale = pixel[3] / 255.0f;
+      pixel[0] = static_cast<uint8_t>(pixel[0] * scale);
+      pixel[1] = static_cast<uint8_t>(pixel[1] * scale);
+      pixel[2] = static_cast<uint8_t>(pixel[2] * scale);
+    }
+  } else if (type == GL_FLOAT) {
+    float values[4];
+    int count = format == GL_LUMINANCE_ALPHA ? 2 : 4;
+    memcpy(values, pixel, count * sizeof(float));
+    float alpha = values[count - 1];
+    for (int i = 0; i < count - 1; ++i) {
+      values[i] *= alpha;
+    }
+    memcpy(pixel, values, count * sizeof(float));
+  } else if (type == GL_HALF_FLOAT || type == HALF_FLOAT_OES) {
+    uint16_t values[4];
+    int count = format == GL_LUMINANCE_ALPHA ? 2 : 4;
+    memcpy(values, pixel, count * sizeof(uint16_t));
+    float alpha = HalfToFloat(values[count - 1]);
+    for (int i = 0; i < count - 1; ++i) {
+      values[i] = FloatToHalf(HalfToFloat(values[i]) * alpha);
+    }
+    memcpy(pixel, values, count * sizeof(uint16_t));
+  } else if (type == GL_UNSIGNED_INT_2_10_10_10_REV) {
+    uint32_t value;
+    memcpy(&value, pixel, 4);
+    unsigned a = value >> 30;
+    unsigned r = (value & 0x3ff) * a / 3;
+    unsigned g = ((value >> 10) & 0x3ff) * a / 3;
+    unsigned b = ((value >> 20) & 0x3ff) * a / 3;
+    value = (a << 30) | (b << 20) | (g << 10) | r;
+    memcpy(pixel, &value, 4);
+  } else if (type == GL_UNSIGNED_SHORT_4_4_4_4) {
+    uint16_t value;
+    memcpy(&value, pixel, 2);
+    unsigned a = value & 0x0f;
+    unsigned r = (value >> 12) * a / 15;
+    unsigned g = ((value >> 8) & 0x0f) * a / 15;
+    unsigned b = ((value >> 4) & 0x0f) * a / 15;
+    value = static_cast<uint16_t>((r << 12) | (g << 8) | (b << 4) | a);
+    memcpy(pixel, &value, 2);
+  } else if (type == GL_UNSIGNED_SHORT_5_5_5_1) {
+    uint16_t value;
+    memcpy(&value, pixel, 2);
+    if ((value & 1) == 0) {
+      value = 0;
+      memcpy(pixel, &value, 2);
+    }
+  }
+}
+
+UnpackStatus WebGLRenderingContext::unpackPixels(GLenum type, GLenum format, GLint width,
+                                                 GLint height, const unsigned char *pixels,
+                                                 size_t length, std::vector<uint8_t> &unpacked) {
+  GLint pixelSize = BytesPerPixel(type, format);
+  if (pixelSize == 0 || width < 0 || height < 0) {
+    return UNPACK_PASSTHROUGH;
   }
 
-  // Compute row stride
-  GLint rowStride = pixelSize * width;
-  if ((rowStride % unpack_alignment) != 0) {
-    rowStride += unpack_alignment - (rowStride % unpack_alignment);
+  GLint rowLength = 0;
+  GLint skipRows = 0;
+  GLint skipPixels = 0;
+  if (isWebGL2) {
+    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &rowLength);
+    glGetIntegerv(GL_UNPACK_SKIP_ROWS, &skipRows);
+    glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &skipPixels);
+  }
+  if (rowLength < 0 || skipRows < 0 || skipPixels < 0) {
+    return UNPACK_PASSTHROUGH;
   }
 
-  GLint imageSize = rowStride * height;
-  std::vector<uint8_t> unpacked(imageSize);
+  size_t pixelsPerRow = rowLength > 0 ? rowLength : width;
+  size_t rowStride = pixelsPerRow * pixelSize;
+  if (unpack_alignment > 0 && rowStride % unpack_alignment != 0) {
+    rowStride += unpack_alignment - rowStride % unpack_alignment;
+  }
+  size_t rowBytes = static_cast<size_t>(width) * pixelSize;
+  size_t rowStart = static_cast<size_t>(skipPixels) * pixelSize;
+  size_t required = 0;
+  if (width > 0 && height > 0) {
+    required = (static_cast<size_t>(skipRows) + height - 1) * rowStride + rowStart + rowBytes;
+  }
+  if (required > length) {
+    return UNPACK_TOO_SMALL;
+  }
+
+  unpacked.assign(pixels, pixels + length);
+  if (width == 0 || height == 0) {
+    return UNPACK_OK;
+  }
+  uint8_t *base = unpacked.data() + static_cast<size_t>(skipRows) * rowStride + rowStart;
 
   if (unpack_flip_y) {
-    for (int i = 0, j = height - 1; j >= 0; ++i, --j) {
-      memcpy(&unpacked[j * rowStride], reinterpret_cast<void *>(pixels + i * rowStride),
-             width * pixelSize);
+    std::vector<uint8_t> tmp(rowBytes);
+    for (GLint i = 0, j = height - 1; i < j; ++i, --j) {
+      uint8_t *top = base + i * rowStride;
+      uint8_t *bottom = base + j * rowStride;
+      memcpy(tmp.data(), top, rowBytes);
+      memmove(top, bottom, rowBytes);
+      memcpy(bottom, tmp.data(), rowBytes);
     }
-  } else {
-    memcpy(unpacked.data(), reinterpret_cast<void *>(pixels), imageSize);
   }
 
-  // Premultiply alpha unpacking
-  if (unpack_premultiply_alpha && (format == GL_LUMINANCE_ALPHA || format == GL_RGBA)) {
-
-    for (int row = 0; row < height; ++row) {
-      for (int col = 0; col < width; ++col) {
-        uint8_t *pixel = &unpacked[(row * rowStride) + (col * pixelSize)];
-        if (format == GL_LUMINANCE_ALPHA) {
-          pixel[0] *= pixel[1] / 255.0;
-        } else if (type == GL_UNSIGNED_BYTE) {
-          float scale = pixel[3] / 255.0;
-          pixel[0] *= scale;
-          pixel[1] *= scale;
-          pixel[2] *= scale;
-        } else if (type == GL_UNSIGNED_SHORT_4_4_4_4) {
-          int r = pixel[0] & 0x0f;
-          int g = pixel[0] >> 4;
-          int b = pixel[1] & 0x0f;
-          int a = pixel[1] >> 4;
-
-          float scale = a / 15.0;
-          r *= scale;
-          g *= scale;
-          b *= scale;
-
-          pixel[0] = r + (g << 4);
-          pixel[1] = b + (a << 4);
-        } else if (type == GL_UNSIGNED_SHORT_5_5_5_1) {
-          if ((pixel[0] & 1) == 0) {
-            pixel[0] = 1; // why does this get set to 1?!?!?!
-            pixel[1] = 0;
-          }
-        }
+  if (unpack_premultiply_alpha && (format == GL_RGBA || format == GL_LUMINANCE_ALPHA)) {
+    for (GLint row = 0; row < height; ++row) {
+      for (GLint col = 0; col < width; ++col) {
+        PremultiplyPixel(base + row * rowStride + col * pixelSize, type, format);
       }
     }
   }
 
-  return unpacked;
+  return UNPACK_OK;
 }
 
-void CallTexImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width,
-                    GLsizei height, GLint border, GLenum format, GLenum type, GLsizei bufSize,
-                    const void *pixels) {
+void CallTexImage2D(bool isWebGL2, GLenum target, GLint level, GLenum internalformat,
+                    GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type,
+                    GLsizei bufSize, const void *pixels) {
   GLenum sizedInternalFormat = SizeFloatingPointFormat(internalformat);
-  if (type == GL_FLOAT && sizedInternalFormat != internalformat) {
+  if (!isWebGL2 && type == GL_FLOAT && sizedInternalFormat != internalformat) {
     glTexStorage2DEXT(target, 1, sizedInternalFormat, width, height);
     if (pixels) {
       glTexSubImage2DRobustANGLE(target, level, 0, 0, width, height, format, type, bufSize, pixels);
@@ -1081,23 +1216,29 @@ GL_METHOD(TexImage2D) {
       return;
     }
     void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[8]).ToChecked()));
-    CallTexImage2D(target, level, internalformat, width, height, border, format, type, 0, offset);
+    CallTexImage2D(inst->isWebGL2, target, level, internalformat, width, height, border, format,
+                   type, 0, offset);
     return;
   }
   Nan::TypedArrayContents<unsigned char> pixels(info[8]);
+  const unsigned char *data = info[8]->IsArrayBufferView() && !*pixels ? &EMPTY_PIXEL : *pixels;
 
-  if (*pixels) {
-    if (inst->unpack_flip_y || inst->unpack_premultiply_alpha) {
-      std::vector<uint8_t> unpacked = inst->unpackPixels(type, format, width, height, *pixels);
-      CallTexImage2D(target, level, internalformat, width, height, border, format, type,
-                     unpacked.size(), unpacked.data());
-    } else {
-      CallTexImage2D(target, level, internalformat, width, height, border, format, type,
-                     pixels.length(), *pixels);
+  if (data && (inst->unpack_flip_y || inst->unpack_premultiply_alpha)) {
+    std::vector<uint8_t> unpacked;
+    UnpackStatus status =
+        inst->unpackPixels(type, format, width, height, data, pixels.length(), unpacked);
+    if (status == UNPACK_TOO_SMALL) {
+      inst->setError(GL_INVALID_OPERATION);
+      return;
     }
-  } else {
-    CallTexImage2D(target, level, internalformat, width, height, border, format, type, 0, nullptr);
+    if (status == UNPACK_OK) {
+      CallTexImage2D(inst->isWebGL2, target, level, internalformat, width, height, border, format,
+                     type, unpacked.size(), unpacked.data());
+      return;
+    }
   }
+  CallTexImage2D(inst->isWebGL2, target, level, internalformat, width, height, border, format,
+                 type, pixels.length(), data);
 }
 
 GL_METHOD(TexSubImage2D) {
@@ -1123,19 +1264,28 @@ GL_METHOD(TexSubImage2D) {
     return;
   }
   Nan::TypedArrayContents<unsigned char> pixels(info[8]);
+  const unsigned char *data = info[8]->IsArrayBufferView() && !*pixels ? &EMPTY_PIXEL : *pixels;
 
   if (inst->unpack_flip_y || inst->unpack_premultiply_alpha) {
-    if (!*pixels) {
+    if (!data) {
       inst->setError(GL_INVALID_OPERATION);
       return;
     }
-    std::vector<uint8_t> unpacked = inst->unpackPixels(type, format, width, height, *pixels);
-    glTexSubImage2DRobustANGLE(target, level, xoffset, yoffset, width, height, format, type,
-                               unpacked.size(), unpacked.data());
-  } else {
-    glTexSubImage2DRobustANGLE(target, level, xoffset, yoffset, width, height, format, type,
-                               pixels.length(), *pixels);
+    std::vector<uint8_t> unpacked;
+    UnpackStatus status =
+        inst->unpackPixels(type, format, width, height, data, pixels.length(), unpacked);
+    if (status == UNPACK_TOO_SMALL) {
+      inst->setError(GL_INVALID_OPERATION);
+      return;
+    }
+    if (status == UNPACK_OK) {
+      glTexSubImage2DRobustANGLE(target, level, xoffset, yoffset, width, height, format, type,
+                                 unpacked.size(), unpacked.data());
+      return;
+    }
   }
+  glTexSubImage2DRobustANGLE(target, level, xoffset, yoffset, width, height, format, type,
+                             pixels.length(), data);
 }
 
 GL_METHOD(TexParameteri) {
@@ -1803,7 +1953,8 @@ GL_METHOD(GetTexParameter) {
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[1]).ToChecked();
 
-  if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT) {
+  if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT || pname == GL_TEXTURE_MIN_LOD ||
+      pname == GL_TEXTURE_MAX_LOD) {
     GLfloat param_value = 0;
     glGetTexParameterfv(target, pname, &param_value);
     info.GetReturnValue().Set(Nan::New<v8::Number>(param_value));
@@ -2531,17 +2682,15 @@ GL_METHOD(TexImage3D) {
   GLenum format = Nan::To<int32_t>(info[7]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[8]).ToChecked();
 
-  if (info[9]->IsUndefined()) {
-    glTexImage3D(target, level, internalformat, width, height, depth, border, format, type,
-                 nullptr);
-  } else if (info[9]->IsArrayBufferView()) {
-    auto buffer = info[9].As<v8::ArrayBufferView>();
-    void *bufferPtr = buffer->Buffer()->GetBackingStore()->Data();
-    glTexImage3D(target, level, internalformat, width, height, depth, border, format, type,
-                 bufferPtr);
-  } else {
-    Nan::ThrowTypeError("Invalid data type for TexImage3D");
+  if (info[9]->IsNumber()) {
+    void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[9]).ToChecked()));
+    glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, offset);
+    return;
   }
+  Nan::TypedArrayContents<unsigned char> pixels(info[9]);
+  const unsigned char *data = info[9]->IsArrayBufferView() && !*pixels ? &EMPTY_PIXEL : *pixels;
+  glTexImage3DRobustANGLE(target, level, internalformat, width, height, depth, border, format, type,
+                          pixels.length(), data);
 }
 
 GL_METHOD(TexSubImage3D) {
@@ -2556,10 +2705,16 @@ GL_METHOD(TexSubImage3D) {
   GLsizei depth = Nan::To<int32_t>(info[7]).ToChecked();
   GLenum format = Nan::To<int32_t>(info[8]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[9]).ToChecked();
+  if (info[10]->IsNumber()) {
+    void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[10]).ToChecked()));
+    glTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, offset);
+    return;
+  }
   Nan::TypedArrayContents<unsigned char> pixels(info[10]);
+  const unsigned char *data = info[10]->IsArrayBufferView() && !*pixels ? &EMPTY_PIXEL : *pixels;
 
   glTexSubImage3DRobustANGLE(target, level, xoffset, yoffset, zoffset, width, height, depth, format,
-                             type, pixels.length(), *pixels);
+                             type, pixels.length(), data);
 }
 
 GL_METHOD(CopyTexSubImage3D) {
