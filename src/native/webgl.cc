@@ -2125,6 +2125,23 @@ GL_METHOD(GetUniform) {
   info.GetReturnValue().Set(arr);
 }
 
+GL_METHOD(GetUniformiv) {
+  GL_BOILERPLATE;
+
+  GLint program = Nan::To<int32_t>(info[0]).ToChecked();
+  GLint location = Nan::To<int32_t>(info[1]).ToChecked();
+
+  GLint data[16] = {0};
+  glGetUniformiv(program, location, data);
+
+  v8::Local<v8::Array> arr = Nan::New<v8::Array>(16);
+  for (int i = 0; i < 16; i++) {
+    Nan::Set(arr, i, Nan::New<v8::Integer>(data[i]));
+  }
+
+  info.GetReturnValue().Set(arr);
+}
+
 GL_METHOD(GetVertexAttrib) {
   GL_BOILERPLATE;
 

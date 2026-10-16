@@ -1977,13 +1977,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         case this.FLOAT_VEC4:
           return new Float32Array(data.slice(0, 4))
         case this.INT:
-          return data[0] | 0
+          return super.getUniformiv(program._ | 0, location._ | 0)[0]
         case this.INT_VEC2:
-          return new Int32Array(data.slice(0, 2))
+          return new Int32Array(super.getUniformiv(program._ | 0, location._ | 0).slice(0, 2))
         case this.INT_VEC3:
-          return new Int32Array(data.slice(0, 3))
+          return new Int32Array(super.getUniformiv(program._ | 0, location._ | 0).slice(0, 3))
         case this.INT_VEC4:
-          return new Int32Array(data.slice(0, 4))
+          return new Int32Array(super.getUniformiv(program._ | 0, location._ | 0).slice(0, 4))
         case this.BOOL:
           return !!data[0]
         case this.BOOL_VEC2:
@@ -2000,7 +2000,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           return new Float32Array(data.slice(0, 16))
         case this.SAMPLER_2D:
         case this.SAMPLER_CUBE:
-          return data[0] | 0
+          return super.getUniformiv(program._ | 0, location._ | 0)[0]
         default:
           return null
       }
