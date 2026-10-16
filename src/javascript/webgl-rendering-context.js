@@ -1055,7 +1055,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return
     }
 
-    if (offset < 0 || offset >= active._size) {
+    if (offset < 0 || offset > active._size) {
       this.setError(this.INVALID_VALUE)
       return
     }
