@@ -77,9 +77,17 @@ function createContext (width, height, options) {
   ctx._checkStencil = false
   ctx._stencilState = true
 
+  ctx._otherBufferBindings = {}
+  ctx._indexedBufferBindings = {}
+
   if (contextAttributes.createWebGL2Context) {
     ctx._vaos = {}
     ctx._activeVertexArrayObject = null
+    ctx._indexedBufferBindings[ctx.UNIFORM_BUFFER] =
+      new Array(ctx.getParameter(ctx.MAX_UNIFORM_BUFFER_BINDINGS)).fill(null)
+    ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] =
+      new Array(ctx.getParameter(ctx.MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS)).fill(null)
+    ctx._uniformBufferOffsetAlignment = ctx.getParameter(ctx.UNIFORM_BUFFER_OFFSET_ALIGNMENT)
   }
 
   // Initialize texture units

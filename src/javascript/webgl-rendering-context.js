@@ -236,13 +236,93 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return true
   }
 
+  _isBufferTarget (target) {
+    if (target === this.ARRAY_BUFFER || target === this.ELEMENT_ARRAY_BUFFER) { return true }
+    return this._isWebGL2() && (
+      target === this.COPY_READ_BUFFER ||
+      target === this.COPY_WRITE_BUFFER ||
+      target === this.PIXEL_PACK_BUFFER ||
+      target === this.PIXEL_UNPACK_BUFFER ||
+      target === this.TRANSFORM_FEEDBACK_BUFFER ||
+      target === this.UNIFORM_BUFFER)
+  }
+
+  _isBufferUsage (usage) {
+    if (usage === this.STREAM_DRAW ||
+      usage === this.STATIC_DRAW ||
+      usage === this.DYNAMIC_DRAW) {
+      return true
+    }
+    return this._isWebGL2() && (
+      usage === this.STREAM_READ ||
+      usage === this.STREAM_COPY ||
+      usage === this.STATIC_READ ||
+      usage === this.STATIC_COPY ||
+      usage === this.DYNAMIC_READ ||
+      usage === this.DYNAMIC_COPY)
+  }
+
+  _isCopyBufferTarget (target) {
+    return this._isWebGL2() &&
+      (target === this.COPY_READ_BUFFER || target === this.COPY_WRITE_BUFFER)
+  }
+
+  _bufferTargetConflicts (buffer, target) {
+    if (this._isCopyBufferTarget(target)) {
+      return false
+    }
+    return Boolean(buffer._binding) &&
+      (buffer._binding === this.ELEMENT_ARRAY_BUFFER) !== (target === this.ELEMENT_ARRAY_BUFFER)
+  }
+
+  _setBufferBinding (buffer, target) {
+    if (!buffer._binding) {
+      buffer._binding = target
+    }
+  }
+
+  _setOtherBufferBinding (target, buffer) {
+    this._otherBufferBindings[target] = buffer
+  }
+
+  _setIndexedBufferBinding (target, index, buffer, offset, size) {
+    this._indexedBufferBindings[target][index] = buffer ? { buffer, offset, size } : null
+  }
+
+  _isIndexedBufferTarget (target) {
+    return this._isWebGL2() &&
+      (target === this.TRANSFORM_FEEDBACK_BUFFER || target === this.UNIFORM_BUFFER)
+  }
+
   _getActiveBuffer (target) {
     if (target === this.ARRAY_BUFFER) {
       return this._vertexGlobalState._arrayBufferBinding
     } else if (target === this.ELEMENT_ARRAY_BUFFER) {
       return this._vertexObjectState._elementArrayBufferBinding
+    } else if (this._isBufferTarget(target)) {
+      return this._otherBufferBindings[target] || null
     }
     return null
+  }
+
+  _isPixelBufferOffset (pixels) {
+    return this._isWebGL2() && typeof pixels === 'number'
+  }
+
+  _checkPixelBufferArgument (pixels, target) {
+    if (!this._isWebGL2()) {
+      return true
+    }
+    const bound = this._getActiveBuffer(target) !== null
+    if ((typeof pixels === 'number') !== bound) {
+      this.setError(this.INVALID_OPERATION)
+      return false
+    }
+    if (typeof pixels === 'number' && pixels < 0) {
+      this.setError(this.INVALID_VALUE)
+      return false
+    }
+    return true
   }
 
   _getActiveTextureUnit () {
@@ -327,6 +407,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   _resizeDrawingBuffer (width, height) {
+    const unpackBuffer = this._isWebGL2() ? this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER) : null
+    if (unpackBuffer) {
+      super.bindBuffer(this.PIXEL_UNPACK_BUFFER, 0)
+    }
     const prevDrawFramebuffer = this._activeFramebuffers.draw
     const prevReadFramebuffer = this._activeFramebuffers.read
     const prevTexture = this._getActiveTexture(this.TEXTURE_2D)
@@ -408,6 +492,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     this.bindTexture(this.TEXTURE_2D, prevTexture)
     this.bindRenderbuffer(this.RENDERBUFFER, prevRenderbuffer)
+    if (unpackBuffer) {
+      super.bindBuffer(this.PIXEL_UNPACK_BUFFER, unpackBuffer._ | 0)
+    }
   }
 
   _restoreError (lastError) {
@@ -617,26 +704,35 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     if (!checkObject(buffer)) {
       throw new TypeError('bindBuffer(GLenum, WebGLBuffer)')
     }
-    if (target !== this.ARRAY_BUFFER &&
-      target !== this.ELEMENT_ARRAY_BUFFER) {
+    if (!this._isBufferTarget(target)) {
       this.setError(this.INVALID_ENUM)
       return
     }
+
+    const isVertexTarget = target === this.ARRAY_BUFFER || target === this.ELEMENT_ARRAY_BUFFER
 
     if (!buffer) {
       buffer = null
       super.bindBuffer(target, 0)
     } else if (buffer._pendingDelete) {
+      if (this._isWebGL2()) {
+        this.setError(this.INVALID_OPERATION)
+      }
       return
     } else if (this._checkWrapper(buffer, WebGLBuffer)) {
-      if (buffer._binding && buffer._binding !== target) {
+      if (this._bufferTargetConflicts(buffer, target)) {
         this.setError(this.INVALID_OPERATION)
         return
       }
-      buffer._binding = target | 0
+      this._setBufferBinding(buffer, target)
 
       super.bindBuffer(target, buffer._ | 0)
     } else {
+      return
+    }
+
+    if (!isVertexTarget) {
+      this._setOtherBufferBinding(target, buffer)
       return
     }
 
@@ -656,30 +752,76 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new TypeError('bindBufferBase(GLenum, GLuint, WebGLBuffer)')
     }
 
+    if (!this._isIndexedBufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (index < 0 || index >= this._indexedBufferBindings[target].length) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
     if (!buffer) {
-      return super.bindBufferBase(target, index, null)
+      super.bindBufferBase(target, index, null)
+      this._setOtherBufferBinding(target, null)
+      this._setIndexedBufferBinding(target, index, null)
     } else if (buffer._pendingDelete) {
-      //
+      this.setError(this.INVALID_OPERATION)
     } else if (this._checkWrapper(buffer, WebGLBuffer)) {
-      return super.bindBufferBase(target, index, buffer._ | 0)
+      if (this._bufferTargetConflicts(buffer, target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+      this._setBufferBinding(buffer, target)
+      super.bindBufferBase(target, index, buffer._ | 0)
+      this._setOtherBufferBinding(target, buffer)
+      this._setIndexedBufferBinding(target, index, buffer, 0, 0)
     }
   }
 
   bindBufferRange (target, index, buffer, offset, size) {
     target |= 0
     index |= 0
-    offset |= 0
-    size |= 0
+    offset = toIntPtr(offset)
+    size = toIntPtr(size)
     if (!checkObject(buffer)) {
       throw new TypeError('bindBufferRange(GLenum, GLuint, WebGLBuffer, GLintptr, GLsizeiptr)')
     }
 
+    if (!this._isIndexedBufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (index < 0 || index >= this._indexedBufferBindings[target].length) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
     if (!buffer) {
-      return super.bindBufferRange(target, index, null, offset, size)
+      super.bindBufferRange(target, index, null, offset, size)
+      this._setOtherBufferBinding(target, null)
+      this._setIndexedBufferBinding(target, index, null)
     } else if (buffer._pendingDelete) {
-      //
+      this.setError(this.INVALID_OPERATION)
     } else if (this._checkWrapper(buffer, WebGLBuffer)) {
-      return super.bindBufferRange(target, index, buffer._ | 0, offset, size)
+      if (this._bufferTargetConflicts(buffer, target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+      if (offset < 0 || size <= 0) {
+        this.setError(this.INVALID_VALUE)
+        return
+      }
+      if (target === this.UNIFORM_BUFFER && offset % this._uniformBufferOffsetAlignment !== 0) {
+        this.setError(this.INVALID_VALUE)
+        return
+      }
+      if (target === this.TRANSFORM_FEEDBACK_BUFFER && (offset % 4 !== 0 || size % 4 !== 0)) {
+        this.setError(this.INVALID_VALUE)
+        return
+      }
+      this._setBufferBinding(buffer, target)
+      super.bindBufferRange(target, index, buffer._ | 0, offset, size)
+      this._setOtherBufferBinding(target, buffer)
+      this._setIndexedBufferBinding(target, index, buffer, offset, size)
     }
   }
 
@@ -964,15 +1106,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   bufferData (target, data, usage) {
     target |= 0
     usage |= 0
-    if (usage !== this.STREAM_DRAW &&
-      usage !== this.STATIC_DRAW &&
-      usage !== this.DYNAMIC_DRAW) {
+    if (!this._isBufferUsage(usage)) {
       this.setError(this.INVALID_ENUM)
       return
     }
 
-    if (target !== this.ARRAY_BUFFER &&
-      target !== this.ELEMENT_ARRAY_BUFFER) {
+    if (!this._isBufferTarget(target)) {
       this.setError(this.INVALID_ENUM)
       return
     }
@@ -1040,8 +1179,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     target |= 0
     offset = toIntPtr(offset)
 
-    if (target !== this.ARRAY_BUFFER &&
-      target !== this.ELEMENT_ARRAY_BUFFER) {
+    if (!this._isBufferTarget(target)) {
       this.setError(this.INVALID_ENUM)
       return
     }
@@ -1279,6 +1417,25 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     if (this._vertexObjectState._elementArrayBufferBinding === buffer) {
       this.bindBuffer(this.ELEMENT_ARRAY_BUFFER, null)
+    }
+    for (const target in this._otherBufferBindings) {
+      if (this._otherBufferBindings[target] === buffer) {
+        this.bindBuffer(target | 0, null)
+      }
+    }
+    for (const target in this._indexedBufferBindings) {
+      const bindings = this._indexedBufferBindings[target]
+      const generic = this._otherBufferBindings[target] || null
+      let unbound = false
+      for (let i = 0; i < bindings.length; ++i) {
+        if (bindings[i] && bindings[i].buffer === buffer) {
+          this.bindBufferBase(target | 0, i, null)
+          unbound = true
+        }
+      }
+      if (unbound && generic) {
+        this.bindBuffer(target | 0, generic)
+      }
     }
 
     this._detachArrayBuffer(buffer)
@@ -1709,6 +1866,18 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         return this._vertexGlobalState._arrayBufferBinding
       case this.ELEMENT_ARRAY_BUFFER_BINDING:
         return this._vertexObjectState._elementArrayBufferBinding
+      case this.COPY_READ_BUFFER_BINDING:
+        return this._getActiveBuffer(this.COPY_READ_BUFFER)
+      case this.COPY_WRITE_BUFFER_BINDING:
+        return this._getActiveBuffer(this.COPY_WRITE_BUFFER)
+      case this.PIXEL_PACK_BUFFER_BINDING:
+        return this._getActiveBuffer(this.PIXEL_PACK_BUFFER)
+      case this.PIXEL_UNPACK_BUFFER_BINDING:
+        return this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER)
+      case this.TRANSFORM_FEEDBACK_BUFFER_BINDING:
+        return this._getActiveBuffer(this.TRANSFORM_FEEDBACK_BUFFER)
+      case this.UNIFORM_BUFFER_BINDING:
+        return this._getActiveBuffer(this.UNIFORM_BUFFER)
       case this.CURRENT_PROGRAM:
         return this._activeProgram
       case this.FRAMEBUFFER_BINDING:
@@ -1769,8 +1938,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   getBufferParameter (target, pname) {
     target |= 0
     pname |= 0
-    if (target !== this.ARRAY_BUFFER &&
-      target !== this.ELEMENT_ARRAY_BUFFER) {
+    if (!this._isBufferTarget(target)) {
       this.setError(this.INVALID_ENUM)
       return null
     }
@@ -2276,6 +2444,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     width |= 0
     height |= 0
 
+    if (!this._isWebGL2() && typeof pixels === 'number') {
+      throw new TypeError('readPixels(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, ArrayBufferView)')
+    }
+    if (!this._checkPixelBufferArgument(pixels, this.PIXEL_PACK_BUFFER)) { return }
+
     super.readPixels(
       x,
       y,
@@ -2429,9 +2602,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     format |= 0
     type |= 0
 
-    if (typeof pixels !== 'object' && pixels !== undefined) {
+    if (typeof pixels !== 'object' && !this._isPixelBufferOffset(pixels) && pixels !== undefined) {
       throw new TypeError('texImage2D(GLenum, GLint, GLenum, GLint, GLint, GLint, GLenum, GLenum, Uint8Array)')
     }
+    if (!this._checkPixelBufferArgument(pixels, this.PIXEL_UNPACK_BUFFER)) { return }
 
     // Note: there's an ANGLE bug where it doesn't check for setting texImage2D on texture zero in WebGL compat.
     if (this._getActiveTextureForImage(target) === null) {
@@ -2441,7 +2615,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       }
     }
 
-    const data = convertPixels(pixels)
+    const data = typeof pixels === 'number' ? pixels : convertPixels(pixels)
 
     // Need to check for out of memory error
     this._saveError()
@@ -2492,11 +2666,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       pixels = convertPixelFormats(this, pixels, this.RGBA, format)
     }
 
-    if (typeof pixels !== 'object') {
+    if (typeof pixels !== 'object' && !this._isPixelBufferOffset(pixels)) {
       throw new TypeError('texSubImage2D(GLenum, GLint, GLint, GLint, GLint, GLint, GLenum, GLenum, Uint8Array)')
     }
+    if (!this._checkPixelBufferArgument(pixels, this.PIXEL_UNPACK_BUFFER)) { return }
 
-    const data = convertPixels(pixels)
+    const data = typeof pixels === 'number' ? pixels : convertPixels(pixels)
 
     super.texSubImage2D(
       target,

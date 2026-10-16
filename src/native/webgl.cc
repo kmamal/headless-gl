@@ -1085,6 +1085,16 @@ GL_METHOD(TexImage2D) {
   GLint border = Nan::To<int32_t>(info[5]).ToChecked();
   GLenum format = Nan::To<int32_t>(info[6]).ToChecked();
   GLint type = Nan::To<int32_t>(info[7]).ToChecked();
+
+  if (info[8]->IsNumber()) {
+    if (inst->unpack_flip_y || inst->unpack_premultiply_alpha) {
+      inst->setError(GL_INVALID_OPERATION);
+      return;
+    }
+    void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[8]).ToChecked()));
+    CallTexImage2D(target, level, internalformat, width, height, border, format, type, 0, offset);
+    return;
+  }
   Nan::TypedArrayContents<unsigned char> pixels(info[8]);
 
   if (*pixels) {
@@ -1112,6 +1122,17 @@ GL_METHOD(TexSubImage2D) {
   GLsizei height = Nan::To<int32_t>(info[5]).ToChecked();
   GLenum format = Nan::To<int32_t>(info[6]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[7]).ToChecked();
+
+  if (info[8]->IsNumber()) {
+    if (inst->unpack_flip_y || inst->unpack_premultiply_alpha) {
+      inst->setError(GL_INVALID_OPERATION);
+      return;
+    }
+    void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[8]).ToChecked()));
+    glTexSubImage2DRobustANGLE(target, level, xoffset, yoffset, width, height, format, type, 0,
+                               offset);
+    return;
+  }
   Nan::TypedArrayContents<unsigned char> pixels(info[8]);
 
   if (inst->unpack_flip_y || inst->unpack_premultiply_alpha) {
@@ -1772,6 +1793,12 @@ GL_METHOD(ReadPixels) {
   GLsizei height = Nan::To<int32_t>(info[3]).ToChecked();
   GLenum format = Nan::To<int32_t>(info[4]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[5]).ToChecked();
+
+  if (info[6]->IsNumber()) {
+    void *offset = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[6]).ToChecked()));
+    glReadPixels(x, y, width, height, format, type, offset);
+    return;
+  }
   Nan::TypedArrayContents<char> pixels(info[6]);
 
   GLsizei length = 0;
@@ -2377,10 +2404,13 @@ GL_METHOD(GetBufferSubData) {
   GL_BOILERPLATE;
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
   GLintptr srcByteOffset = Nan::To<int64_t>(info[1]).ToChecked();
-  auto buffer = info[2].As<v8::ArrayBufferView>();
-  void *bufferPtr = buffer->Buffer()->GetBackingStore()->Data();
-  GLsizeiptr bufferSize = buffer->ByteLength();
-  // TODO:  glGetBufferSubData(target, srcByteOffset, bufferSize, bufferPtr);
+  Nan::TypedArrayContents<char> data(info[2]);
+  GLsizeiptr size = data.length();
+  void *mapped = glMapBufferRange(target, srcByteOffset, size, GL_MAP_READ_BIT);
+  if (mapped != nullptr) {
+    memcpy(*data, mapped, size);
+    glUnmapBuffer(target);
+  }
 }
 
 GL_METHOD(BlitFramebuffer) {
@@ -3119,9 +3149,23 @@ GL_METHOD(GetIndexedParameter) {
   GL_BOILERPLATE;
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
   GLuint index = Nan::To<uint32_t>(info[1]).ToChecked();
-  GLint result;
-  glGetIntegeri_v(target, index, &result);
-  info.GetReturnValue().Set(Nan::New(result));
+  switch (target) {
+  case GL_TRANSFORM_FEEDBACK_BUFFER_START:
+  case GL_TRANSFORM_FEEDBACK_BUFFER_SIZE:
+  case GL_UNIFORM_BUFFER_START:
+  case GL_UNIFORM_BUFFER_SIZE: {
+    GLint64 result = 0;
+    glGetInteger64i_v(target, index, &result);
+    info.GetReturnValue().Set(Nan::New<v8::Number>(static_cast<double>(result)));
+    return;
+  }
+  default: {
+    GLint result = 0;
+    glGetIntegeri_v(target, index, &result);
+    info.GetReturnValue().Set(Nan::New(result));
+    return;
+  }
+  }
 }
 
 GL_METHOD(GetUniformIndices) {
