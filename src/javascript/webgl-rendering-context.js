@@ -1968,10 +1968,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           searchName = name.replace(/\[\d+\]$/, '[0]')
         }
 
+        const arrayName = /\]$/.test(name) ? null : name + '[0]'
         let info = null
+        let implicitArray = false
         for (let i = 0; i < program._uniforms.length; ++i) {
           const infoItem = program._uniforms[i]
-          if (infoItem.name === searchName) {
+          if (infoItem.name === searchName || infoItem.name === arrayName) {
+            implicitArray = infoItem.name === arrayName
             info = {
               size: infoItem.size,
               type: infoItem.type,
@@ -1989,7 +1992,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           info)
 
         // handle array case
-        if (/\[0\]$/.test(name)) {
+        if (implicitArray || /\[0\]$/.test(name)) {
           const baseName = name.replace(/\[0\]$/, '')
           const arrayLocs = []
 
