@@ -42,8 +42,8 @@ const { WebGLVertexArrayObject } = require('./webgl-vertex-array-object')
 const { getEXTColorBufferFloat } = require('./extensions/ext-color-buffer-float')
 
 // These are defined by the WebGL spec
-const MAX_UNIFORM_LENGTH = 256
-const MAX_ATTRIBUTE_LENGTH = 256
+const MAX_IDENTIFIER_LENGTH = 256
+const MAX_WEBGL2_IDENTIFIER_LENGTH = 1024
 
 const DEFAULT_ATTACHMENTS = [
   gl.COLOR_ATTACHMENT0,
@@ -73,7 +73,8 @@ const availableExtensions = {
 const privateMethods = [
   'constructor',
   'resize',
-  'destroy'
+  'destroy',
+  'getUniformuiv'
 ]
 
 function wrapContext (ctx) {
@@ -199,7 +200,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
     // Check attribute names
     for (let i = 0; i < names.length; ++i) {
-      if (names[i].length > MAX_ATTRIBUTE_LENGTH) {
+      if (!this._isWebGL2() && names[i].length > this._maxIdentifierLength()) {
         program._linkInfoLog = 'attribute ' + names[i] + ' is too long'
         return false
       }
@@ -222,7 +223,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
     // Check attribute and uniform name lengths
     for (let i = 0; i < program._uniforms.length; ++i) {
-      if (program._uniforms[i].name.length > MAX_UNIFORM_LENGTH) {
+      if (!this._isWebGL2() && program._uniforms[i].name.length > this._maxIdentifierLength()) {
         program._linkInfoLog = 'uniform ' + program._uniforms[i].name + ' is too long'
         return false
       }
@@ -573,7 +574,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   _validGLSLIdentifier (str) {
     return !(str.indexOf('webgl_') === 0 ||
       str.indexOf('_webgl_') === 0 ||
-      str.length > 256)
+      str.length > this._maxIdentifierLength())
   }
 
   _validTextureTarget (target) {
@@ -652,7 +653,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new TypeError('bindAttribLocation(WebGLProgram, GLint, String)')
     }
     name += ''
-    if (!isValidString(name) || name.length > MAX_ATTRIBUTE_LENGTH) {
+    if (!isValidString(name) || name.length > this._maxIdentifierLength()) {
       this.setError(this.INVALID_VALUE)
     } else if (/^_?webgl_a/.test(name)) {
       this.setError(this.INVALID_OPERATION)
@@ -1850,7 +1851,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new TypeError('getAttribLocation(WebGLProgram, String)')
     }
     name += ''
-    if (!isValidString(name) || name.length > MAX_ATTRIBUTE_LENGTH) {
+    if (!isValidString(name) || name.length > this._maxIdentifierLength()) {
       this.setError(this.INVALID_VALUE)
     } else if (this._checkWrapper(program, WebGLProgram)) {
       return super.getAttribLocation(program._ | 0, name + '')
@@ -2149,6 +2150,23 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           return new Float32Array(data.slice(0, 3))
         case this.FLOAT_VEC4:
           return new Float32Array(data.slice(0, 4))
+        case this.UNSIGNED_INT:
+          return super.getUniformuiv(program._ | 0, location._ | 0)[0]
+        case this.UNSIGNED_INT_VEC2:
+          return new Uint32Array(super.getUniformuiv(program._ | 0, location._ | 0).slice(0, 2))
+        case this.UNSIGNED_INT_VEC3:
+          return new Uint32Array(super.getUniformuiv(program._ | 0, location._ | 0).slice(0, 3))
+        case this.UNSIGNED_INT_VEC4:
+          return new Uint32Array(super.getUniformuiv(program._ | 0, location._ | 0).slice(0, 4))
+        case this.FLOAT_MAT2x3:
+        case this.FLOAT_MAT3x2:
+          return new Float32Array(data.slice(0, 6))
+        case this.FLOAT_MAT2x4:
+        case this.FLOAT_MAT4x2:
+          return new Float32Array(data.slice(0, 8))
+        case this.FLOAT_MAT3x4:
+        case this.FLOAT_MAT4x3:
+          return new Float32Array(data.slice(0, 12))
         case this.INT:
           return super.getUniformiv(program._ | 0, location._ | 0)[0]
         case this.INT_VEC2:
@@ -2173,6 +2191,19 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
           return new Float32Array(data.slice(0, 16))
         case this.SAMPLER_2D:
         case this.SAMPLER_CUBE:
+        case this.SAMPLER_3D:
+        case this.SAMPLER_2D_ARRAY:
+        case this.SAMPLER_2D_SHADOW:
+        case this.SAMPLER_2D_ARRAY_SHADOW:
+        case this.SAMPLER_CUBE_SHADOW:
+        case this.INT_SAMPLER_2D:
+        case this.INT_SAMPLER_3D:
+        case this.INT_SAMPLER_CUBE:
+        case this.INT_SAMPLER_2D_ARRAY:
+        case this.UNSIGNED_INT_SAMPLER_2D:
+        case this.UNSIGNED_INT_SAMPLER_3D:
+        case this.UNSIGNED_INT_SAMPLER_CUBE:
+        case this.UNSIGNED_INT_SAMPLER_2D_ARRAY:
           return super.getUniformiv(program._ | 0, location._ | 0)[0]
         default:
           return null
@@ -3239,6 +3270,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   _isWebGL2 () {
     return this.TEXTURE_2D_ARRAY !== undefined
+  }
+
+  _maxIdentifierLength () {
+    return this._isWebGL2() ? MAX_WEBGL2_IDENTIFIER_LENGTH : MAX_IDENTIFIER_LENGTH
   }
 }
 

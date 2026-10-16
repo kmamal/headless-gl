@@ -2,6 +2,23 @@ const { gl } = require('./native-gl')
 
 const { WebGLUniformLocation } = require('./webgl-uniform-location')
 
+const UNSIGNED_INT_VEC2 = 0x8DC6
+const UNSIGNED_INT_VEC3 = 0x8DC7
+const UNSIGNED_INT_VEC4 = 0x8DC8
+const SAMPLER_3D = 0x8B5F
+const SAMPLER_2D_SHADOW = 0x8B62
+const SAMPLER_2D_ARRAY = 0x8DC1
+const SAMPLER_2D_ARRAY_SHADOW = 0x8DC4
+const SAMPLER_CUBE_SHADOW = 0x8DC5
+const INT_SAMPLER_2D = 0x8DCA
+const INT_SAMPLER_3D = 0x8DCB
+const INT_SAMPLER_CUBE = 0x8DCC
+const INT_SAMPLER_2D_ARRAY = 0x8DCF
+const UNSIGNED_INT_SAMPLER_2D = 0x8DD2
+const UNSIGNED_INT_SAMPLER_3D = 0x8DD3
+const UNSIGNED_INT_SAMPLER_CUBE = 0x8DD4
+const UNSIGNED_INT_SAMPLER_2D_ARRAY = 0x8DD7
+
 function bindPublics (props, wrapper, privateInstance, privateMethods) {
   for (let i = 0; i < props.length; i++) {
     const prop = props[i]
@@ -102,23 +119,40 @@ function uniformTypeSize (type) {
     case gl.BOOL_VEC4:
     case gl.INT_VEC4:
     case gl.FLOAT_VEC4:
+    case UNSIGNED_INT_VEC4:
       return 4
 
     case gl.BOOL_VEC3:
     case gl.INT_VEC3:
     case gl.FLOAT_VEC3:
+    case UNSIGNED_INT_VEC3:
       return 3
 
     case gl.BOOL_VEC2:
     case gl.INT_VEC2:
     case gl.FLOAT_VEC2:
+    case UNSIGNED_INT_VEC2:
       return 2
 
     case gl.BOOL:
     case gl.INT:
     case gl.FLOAT:
+    case gl.UNSIGNED_INT:
     case gl.SAMPLER_2D:
     case gl.SAMPLER_CUBE:
+    case SAMPLER_3D:
+    case SAMPLER_2D_SHADOW:
+    case SAMPLER_2D_ARRAY:
+    case SAMPLER_2D_ARRAY_SHADOW:
+    case SAMPLER_CUBE_SHADOW:
+    case INT_SAMPLER_2D:
+    case INT_SAMPLER_3D:
+    case INT_SAMPLER_CUBE:
+    case INT_SAMPLER_2D_ARRAY:
+    case UNSIGNED_INT_SAMPLER_2D:
+    case UNSIGNED_INT_SAMPLER_3D:
+    case UNSIGNED_INT_SAMPLER_CUBE:
+    case UNSIGNED_INT_SAMPLER_2D_ARRAY:
       return 1
 
     default:

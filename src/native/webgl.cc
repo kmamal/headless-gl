@@ -2135,6 +2135,23 @@ GL_METHOD(GetRenderbufferParameter) {
   info.GetReturnValue().Set(Nan::New<v8::Integer>(value));
 }
 
+GL_METHOD(GetUniformuiv) {
+  GL_BOILERPLATE;
+
+  GLint program = Nan::To<int32_t>(info[0]).ToChecked();
+  GLint location = Nan::To<int32_t>(info[1]).ToChecked();
+
+  GLuint data[16] = {0};
+  glGetUniformuiv(program, location, data);
+
+  v8::Local<v8::Array> arr = Nan::New<v8::Array>(16);
+  for (int i = 0; i < 16; i++) {
+    Nan::Set(arr, i, Nan::New<v8::Number>(data[i]));
+  }
+
+  info.GetReturnValue().Set(arr);
+}
+
 GL_METHOD(GetUniform) {
   GL_BOILERPLATE;
 
@@ -2663,97 +2680,77 @@ GL_METHOD(Uniform4ui) {
 GL_METHOD(Uniform1uiv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto data = info[1].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / sizeof(GLuint);
-  glUniform1uiv(location, count, bufferPtr);
+  Nan::TypedArrayContents<GLuint> data(info[1]);
+  glUniform1uiv(location, data.length() / 1, *data);
 }
 
 GL_METHOD(Uniform2uiv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto data = info[1].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (2 * sizeof(GLuint));
-  glUniform2uiv(location, count, bufferPtr);
+  Nan::TypedArrayContents<GLuint> data(info[1]);
+  glUniform2uiv(location, data.length() / 2, *data);
 }
 
 GL_METHOD(Uniform3uiv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto data = info[1].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (3 * sizeof(GLuint));
-  glUniform3uiv(location, count, bufferPtr);
+  Nan::TypedArrayContents<GLuint> data(info[1]);
+  glUniform3uiv(location, data.length() / 3, *data);
 }
 
 GL_METHOD(Uniform4uiv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto data = info[1].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (4 * sizeof(GLuint));
-  glUniform4uiv(location, count, bufferPtr);
+  Nan::TypedArrayContents<GLuint> data(info[1]);
+  glUniform4uiv(location, data.length() / 4, *data);
 }
 
 GL_METHOD(UniformMatrix3x2fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (6 * sizeof(GLfloat));
-  glUniformMatrix3x2fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix3x2fv(location, data.length() / 6, transpose, *data);
 }
 
 GL_METHOD(UniformMatrix4x2fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (8 * sizeof(GLfloat));
-  glUniformMatrix4x2fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix4x2fv(location, data.length() / 8, transpose, *data);
 }
 
 GL_METHOD(UniformMatrix2x3fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (6 * sizeof(GLfloat));
-  glUniformMatrix2x3fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix2x3fv(location, data.length() / 6, transpose, *data);
 }
 
 GL_METHOD(UniformMatrix4x3fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (12 * sizeof(GLfloat));
-  glUniformMatrix4x3fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix4x3fv(location, data.length() / 12, transpose, *data);
 }
 
 GL_METHOD(UniformMatrix2x4fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (8 * sizeof(GLfloat));
-  glUniformMatrix2x4fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix2x4fv(location, data.length() / 8, transpose, *data);
 }
 
 GL_METHOD(UniformMatrix3x4fv) {
   GL_BOILERPLATE;
   GLuint location = Nan::To<uint32_t>(info[0]).ToChecked();
   GLboolean transpose = Nan::To<bool>(info[1]).ToChecked();
-  auto data = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(data->Buffer()->GetBackingStore()->Data());
-  GLsizei count = data->ByteLength() / (12 * sizeof(GLfloat));
-  glUniformMatrix3x4fv(location, count, transpose, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> data(info[2]);
+  glUniformMatrix3x4fv(location, data.length() / 12, transpose, *data);
 }
 
 GL_METHOD(VertexAttribI4i) {
@@ -3173,20 +3170,19 @@ GL_METHOD(GetUniformIndices) {
   GLuint program = Nan::To<uint32_t>(info[0]).ToChecked();
   auto uniformNames = info[1].As<v8::Array>();
   GLsizei count = uniformNames->Length();
-  const char **names = new const char *[count];
+  std::vector<std::string> names(count);
+  std::vector<const char *> namePointers(count);
   for (GLsizei i = 0; i < count; i++) {
-    Nan::Utf8String name(Nan::Get(uniformNames, i).ToLocalChecked());
-    names[i] = *name;
+    names[i] = *Nan::Utf8String(Nan::Get(uniformNames, i).ToLocalChecked());
+    namePointers[i] = names[i].c_str();
   }
-  GLuint *indices = new GLuint[count];
-  glGetUniformIndices(program, count, names, indices);
+  std::vector<GLuint> indices(count);
+  glGetUniformIndices(program, count, namePointers.data(), indices.data());
   v8::Local<v8::Array> result = Nan::New<v8::Array>(count);
   for (GLsizei i = 0; i < count; i++) {
     Nan::Set(result, i, Nan::New(indices[i]));
   }
   info.GetReturnValue().Set(result);
-  delete[] names;
-  delete[] indices;
 }
 
 GL_METHOD(GetActiveUniforms) {
@@ -3223,7 +3219,21 @@ GL_METHOD(GetActiveUniformBlockParameter) {
   GLuint program = Nan::To<uint32_t>(info[0]).ToChecked();
   GLuint uniformBlockIndex = Nan::To<uint32_t>(info[1]).ToChecked();
   GLenum pname = Nan::To<int32_t>(info[2]).ToChecked();
-  GLint result;
+  if (pname == GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES) {
+    GLint count = 0;
+    glGetActiveUniformBlockiv(program, uniformBlockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &count);
+    std::vector<GLint> indices(count);
+    if (count > 0) {
+      glGetActiveUniformBlockiv(program, uniformBlockIndex, pname, indices.data());
+    }
+    v8::Local<v8::Array> result = Nan::New<v8::Array>(count);
+    for (GLint i = 0; i < count; i++) {
+      Nan::Set(result, i, Nan::New(indices[i]));
+    }
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  GLint result = 0;
   glGetActiveUniformBlockiv(program, uniformBlockIndex, pname, &result);
   info.GetReturnValue().Set(Nan::New(result));
 }
@@ -3232,10 +3242,13 @@ GL_METHOD(GetActiveUniformBlockName) {
   GL_BOILERPLATE;
   GLuint program = Nan::To<uint32_t>(info[0]).ToChecked();
   GLuint uniformBlockIndex = Nan::To<uint32_t>(info[1]).ToChecked();
-  char name[256];
-  GLsizei length;
-  glGetActiveUniformBlockName(program, uniformBlockIndex, 256, &length, name);
-  info.GetReturnValue().Set(Nan::New(name).ToLocalChecked());
+  GLint maxLength = 0;
+  glGetActiveUniformBlockiv(program, uniformBlockIndex, GL_UNIFORM_BLOCK_NAME_LENGTH, &maxLength);
+  std::vector<char> name(maxLength > 0 ? maxLength + 1 : 1, 0);
+  GLsizei length = 0;
+  glGetActiveUniformBlockName(program, uniformBlockIndex, static_cast<GLsizei>(name.size()),
+                              &length, name.data());
+  info.GetReturnValue().Set(Nan::New(name.data()).ToLocalChecked());
 }
 
 GL_METHOD(UniformBlockBinding) {

@@ -190,6 +190,7 @@ NAN_MODULE_INIT(Init) {
   JS_GL_METHOD("uniform2uiv", Uniform2uiv);
   JS_GL_METHOD("uniform3uiv", Uniform3uiv);
   JS_GL_METHOD("uniform4uiv", Uniform4uiv);
+  JS_GL_METHOD("getUniformuiv", GetUniformuiv);
   JS_GL_METHOD("uniformMatrix3x2fv", UniformMatrix3x2fv);
   JS_GL_METHOD("uniformMatrix4x2fv", UniformMatrix4x2fv);
   JS_GL_METHOD("uniformMatrix2x3fv", UniformMatrix2x3fv);
