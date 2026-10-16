@@ -1264,6 +1264,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return
     }
 
+    if (buffer._pendingDelete) {
+      return
+    }
+
     if (this._vertexGlobalState._arrayBufferBinding === buffer) {
       this.bindBuffer(this.ARRAY_BUFFER, null)
     }
@@ -2160,6 +2164,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   isBuffer (object) {
     if (!this._isObject(object, 'isBuffer', WebGLBuffer)) return false
+    if (object._pendingDelete) return false
     return super.isBuffer(object._ | 0)
   }
 
