@@ -1750,7 +1750,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         precisionType === this.MEDIUM_INT ||
         precisionType === this.HIGH_INT)) {
       this.setError(this.INVALID_ENUM)
-      return
+      return null
     }
 
     const format = super.getShaderPrecisionFormat(shaderType, precisionType)
@@ -2016,7 +2016,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     name += ''
     if (!isValidString(name)) {
       this.setError(this.INVALID_VALUE)
-      return
+      return null
     }
 
     if (this._checkWrapper(program, WebGLProgram)) {
