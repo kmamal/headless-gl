@@ -471,6 +471,9 @@ void WebGLRenderingContext::dispose() {
     case GLOBJECT_TYPE_SYNC:
       glDeleteSync(IntToSync(obj));
       break;
+    case GLOBJECT_TYPE_TRANSFORM_FEEDBACK:
+      glDeleteTransformFeedbacks(1, &obj);
+      break;
     default:
       break;
     }
@@ -3211,12 +3214,14 @@ GL_METHOD(CreateTransformFeedback) {
   GL_BOILERPLATE;
   GLuint tf;
   glGenTransformFeedbacks(1, &tf);
+  inst->registerGLObj(GLOBJECT_TYPE_TRANSFORM_FEEDBACK, tf);
   info.GetReturnValue().Set(Nan::New(tf));
 }
 
 GL_METHOD(DeleteTransformFeedback) {
   GL_BOILERPLATE;
   GLuint tf = Nan::To<uint32_t>(info[0]).ToChecked();
+  inst->unregisterGLObj(GLOBJECT_TYPE_TRANSFORM_FEEDBACK, tf);
   glDeleteTransformFeedbacks(1, &tf);
 }
 
@@ -3248,29 +3253,35 @@ GL_METHOD(EndTransformFeedback) {
 GL_METHOD(TransformFeedbackVaryings) {
   GL_BOILERPLATE;
   GLuint program = Nan::To<uint32_t>(info[0]).ToChecked();
+  if (!info[1]->IsArray()) {
+    return Nan::ThrowTypeError("transformFeedbackVaryings(GLuint, Array, GLenum)");
+  }
   auto varyings = info[1].As<v8::Array>();
   GLenum bufferMode = Nan::To<int32_t>(info[2]).ToChecked();
   GLsizei count = varyings->Length();
-  const char **varyingStrings = new const char *[count];
+  std::vector<std::string> names(count);
+  std::vector<const char *> namePointers(count);
   for (GLsizei i = 0; i < count; i++) {
-    Nan::Utf8String str(Nan::Get(varyings, i).ToLocalChecked());
-    varyingStrings[i] = *str;
+    names[i] = *Nan::Utf8String(Nan::Get(varyings, i).ToLocalChecked());
+    namePointers[i] = names[i].c_str();
   }
-  glTransformFeedbackVaryings(program, count, varyingStrings, bufferMode);
-  delete[] varyingStrings;
+  glTransformFeedbackVaryings(program, count, namePointers.data(), bufferMode);
 }
 
 GL_METHOD(GetTransformFeedbackVarying) {
   GL_BOILERPLATE;
   GLuint program = Nan::To<uint32_t>(info[0]).ToChecked();
   GLuint index = Nan::To<uint32_t>(info[1]).ToChecked();
-  char name[256];
-  GLsizei length;
-  GLsizei size;
-  GLenum type;
-  glGetTransformFeedbackVarying(program, index, 256, &length, &size, &type, name);
+  GLint maxLength = 0;
+  glGetProgramiv(program, GL_TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH, &maxLength);
+  std::vector<char> name(maxLength > 0 ? maxLength + 1 : 1, 0);
+  GLsizei length = 0;
+  GLsizei size = 0;
+  GLenum type = 0;
+  glGetTransformFeedbackVarying(program, index, static_cast<GLsizei>(name.size()), &length, &size,
+                                &type, name.data());
   v8::Local<v8::Object> result = Nan::New<v8::Object>();
-  Nan::Set(result, Nan::New("name").ToLocalChecked(), Nan::New(name).ToLocalChecked());
+  Nan::Set(result, Nan::New("name").ToLocalChecked(), Nan::New(name.data()).ToLocalChecked());
   Nan::Set(result, Nan::New("size").ToLocalChecked(), Nan::New(size));
   Nan::Set(result, Nan::New("type").ToLocalChecked(), Nan::New(type));
   info.GetReturnValue().Set(result);

@@ -782,6 +782,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       this.setError(this.INVALID_VALUE)
       return
     }
+    if (target === this.TRANSFORM_FEEDBACK_BUFFER && this._activeTransformFeedback._active) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
     if (!buffer) {
       super.bindBufferBase(target, index, null)
       this._setOtherBufferBinding(target, null)
@@ -815,6 +819,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     if (index < 0 || index >= this._indexedBufferBindings[target].length) {
       this.setError(this.INVALID_VALUE)
+      return
+    }
+    if (target === this.TRANSFORM_FEEDBACK_BUFFER && this._activeTransformFeedback._active) {
+      this.setError(this.INVALID_OPERATION)
       return
     }
     if (!buffer) {
@@ -1457,7 +1465,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       let unbound = false
       for (let i = 0; i < bindings.length; ++i) {
         if (bindings[i] && bindings[i].buffer === buffer) {
-          this.bindBufferBase(target | 0, i, null)
+          if ((target | 0) === this.TRANSFORM_FEEDBACK_BUFFER && this._activeTransformFeedback._active) {
+            this._setIndexedBufferBinding(target | 0, i, null)
+          } else {
+            this.bindBufferBase(target | 0, i, null)
+          }
           unbound = true
         }
       }

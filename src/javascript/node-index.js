@@ -3,6 +3,7 @@ const { WebGLContextAttributes } = require('./webgl-context-attributes')
 const { WebGLRenderingContext, wrapContext } = require('./webgl-rendering-context')
 const { WebGL2RenderingContext } = require('./webgl2-rendering-context')
 const { WebGLTextureUnit } = require('./webgl-texture-unit')
+const { WebGLTransformFeedback } = require('./webgl-transform-feedback')
 const { WebGLVertexArrayObjectState, WebGLVertexArrayGlobalState } = require('./webgl-vertex-attribute')
 
 let CONTEXT_COUNTER = 0
@@ -87,10 +88,14 @@ function createContext (width, height, options) {
     ctx._queries = {}
     ctx._activeQueries = {}
     ctx._syncs = {}
+    ctx._transformFeedbacks = {}
+    ctx._maxTransformFeedbackSeparateAttribs = ctx.getParameter(ctx.MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS)
+    ctx._defaultTransformFeedback = new WebGLTransformFeedback(0, ctx)
+    ctx._activeTransformFeedback = ctx._defaultTransformFeedback
+
     ctx._indexedBufferBindings[ctx.UNIFORM_BUFFER] =
       new Array(ctx.getParameter(ctx.MAX_UNIFORM_BUFFER_BINDINGS)).fill(null)
-    ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] =
-      new Array(ctx.getParameter(ctx.MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS)).fill(null)
+    ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] = ctx._defaultTransformFeedback._bindings
     ctx._uniformBufferOffsetAlignment = ctx.getParameter(ctx.UNIFORM_BUFFER_OFFSET_ALIGNMENT)
     ctx._maxDrawBuffers = ctx.getParameter(ctx.MAX_DRAW_BUFFERS)
     ctx._maxColorAttachments = ctx.getParameter(ctx.MAX_COLOR_ATTACHMENTS)

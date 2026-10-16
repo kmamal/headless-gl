@@ -5,6 +5,8 @@ const { WebGLBuffer } = require('./webgl-buffer')
 const { WebGLSampler } = require('./webgl-sampler')
 const { WebGLQuery } = require('./webgl-query')
 const { WebGLSync } = require('./webgl-sync')
+const { WebGLTransformFeedback } = require('./webgl-transform-feedback')
+const { WebGLActiveInfo } = require('./webgl-active-info')
 const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
@@ -1087,6 +1089,16 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     if (pname === this.MAX_CLIENT_WAIT_TIMEOUT_WEBGL) {
       return MAX_CLIENT_WAIT_TIMEOUT
     }
+    if (pname === this.TRANSFORM_FEEDBACK_BINDING) {
+      const tf = this._activeTransformFeedback
+      return tf === this._defaultTransformFeedback ? null : tf
+    }
+    if (pname === this.TRANSFORM_FEEDBACK_ACTIVE) {
+      return this._activeTransformFeedback._active
+    }
+    if (pname === this.TRANSFORM_FEEDBACK_PAUSED) {
+      return this._activeTransformFeedback._paused
+    }
     if (pname === this.READ_BUFFER) {
       const framebuffer = this._activeFramebuffers.read
       return framebuffer ? framebuffer._readBuffer : this._defaultReadBuffer
@@ -1755,6 +1767,221 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     return null
   }
 
+  createTransformFeedback () {
+    const id = super.createTransformFeedback()
+    if (id <= 0) return null
+    const tf = new WebGLTransformFeedback(id, this)
+    this._transformFeedbacks[id] = tf
+    return tf
+  }
+
+  deleteTransformFeedback (tf) {
+    if (!checkObject(tf)) {
+      throw new TypeError('deleteTransformFeedback(WebGLTransformFeedback)')
+    }
+
+    if (!tf) {
+      return
+    }
+
+    if (!(tf instanceof WebGLTransformFeedback &&
+      this._checkOwns(tf))) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (tf._pendingDelete) {
+      return
+    }
+
+    if (tf._active) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (this._activeTransformFeedback === tf) {
+      this.bindTransformFeedback(this.TRANSFORM_FEEDBACK, null)
+    }
+
+    tf._pendingDelete = true
+    tf._checkDelete()
+  }
+
+  isTransformFeedback (object) {
+    if (!this._isObject(object, 'isTransformFeedback', WebGLTransformFeedback)) return false
+    return super.isTransformFeedback(object._ | 0)
+  }
+
+  bindTransformFeedback (target, tf) {
+    target |= 0
+    if (!checkObject(tf)) {
+      throw new TypeError('bindTransformFeedback(GLenum, WebGLTransformFeedback)')
+    }
+
+    if (target !== this.TRANSFORM_FEEDBACK) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+
+    const current = this._activeTransformFeedback
+    if (current._active && !current._paused) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (!tf) {
+      tf = this._defaultTransformFeedback
+      super.bindTransformFeedback(target, 0)
+    } else if (tf._pendingDelete) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    } else if (this._checkWrapper(tf, WebGLTransformFeedback)) {
+      super.bindTransformFeedback(target, tf._ | 0)
+    } else {
+      return
+    }
+
+    if (current !== tf) {
+      if (current !== this._defaultTransformFeedback) {
+        current._refCount -= 1
+        current._checkDelete()
+      }
+      if (tf !== this._defaultTransformFeedback) {
+        tf._refCount += 1
+      }
+    }
+    this._activeTransformFeedback = tf
+    this._indexedBufferBindings[this.TRANSFORM_FEEDBACK_BUFFER] = tf._bindings
+  }
+
+  beginTransformFeedback (primitiveMode) {
+    primitiveMode |= 0
+    if (primitiveMode !== this.POINTS &&
+      primitiveMode !== this.LINES &&
+      primitiveMode !== this.TRIANGLES) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    const tf = this._activeTransformFeedback
+    const program = this._activeProgram
+    if (tf._active ||
+      !program ||
+      !gl.getProgramParameter.call(this, program._ | 0, this.TRANSFORM_FEEDBACK_VARYINGS)) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    this._saveError()
+    super.beginTransformFeedback(primitiveMode)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error !== this.NO_ERROR) {
+      return
+    }
+
+    tf._active = true
+    tf._paused = false
+    tf._program = program
+    program._refCount += 1
+  }
+
+  endTransformFeedback () {
+    const tf = this._activeTransformFeedback
+    if (!tf._active) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.endTransformFeedback()
+    tf._active = false
+    tf._paused = false
+    const program = tf._program
+    tf._program = null
+    program._refCount -= 1
+    program._checkDelete()
+  }
+
+  pauseTransformFeedback () {
+    const tf = this._activeTransformFeedback
+    if (!tf._active || tf._paused) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.pauseTransformFeedback()
+    tf._paused = true
+  }
+
+  resumeTransformFeedback () {
+    const tf = this._activeTransformFeedback
+    if (!tf._active || !tf._paused) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    if (tf._program !== this._activeProgram) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.resumeTransformFeedback()
+    tf._paused = false
+  }
+
+  transformFeedbackVaryings (program, varyings, bufferMode) {
+    bufferMode |= 0
+    if (!program || !checkObject(program) || !isSequence(varyings)) {
+      throw new TypeError('transformFeedbackVaryings(WebGLProgram, Array, GLenum)')
+    }
+    varyings = Array.from(varyings)
+    if (!this._checkWrapper(program, WebGLProgram)) {
+      return
+    }
+    if (bufferMode !== this.INTERLEAVED_ATTRIBS && bufferMode !== this.SEPARATE_ATTRIBS) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (bufferMode === this.SEPARATE_ATTRIBS &&
+      varyings.length > this._maxTransformFeedbackSeparateAttribs) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+    const names = new Array(varyings.length)
+    for (let i = 0; i < varyings.length; ++i) {
+      names[i] = varyings[i] + ''
+      if (!isValidString(names[i]) || names[i].length > MAX_IDENTIFIER_LENGTH) {
+        this.setError(this.INVALID_VALUE)
+        return
+      }
+    }
+    super.transformFeedbackVaryings(program._ | 0, names, bufferMode)
+  }
+
+  getTransformFeedbackVarying (program, index) {
+    index |= 0
+    if (!this._checkProgramIndex(program, index, this.TRANSFORM_FEEDBACK_VARYINGS, 'getTransformFeedbackVarying')) {
+      return null
+    }
+    const info = super.getTransformFeedbackVarying(program._ | 0, index)
+    if (!info) {
+      return null
+    }
+    return new WebGLActiveInfo(info)
+  }
+
+  useProgram (program) {
+    const tf = this._activeTransformFeedback
+    if (tf._active && !tf._paused && program !== this._activeProgram) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    return super.useProgram(program)
+  }
+
+  linkProgram (program) {
+    if (program && this._allTransformFeedbacks().some((tf) => tf._active && tf._program === program)) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    return super.linkProgram(program)
+  }
+
   getUniformLocation (program, name) {
     if ((name + '').length > MAX_IDENTIFIER_LENGTH) {
       this.setError(this.INVALID_VALUE)
@@ -1885,7 +2112,40 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     return new Uint8Array(data.buffer, data.byteOffset + srcOffset * elementSize, count * elementSize)
   }
 
+  _boundToActiveTransformFeedback (target) {
+    return this._inActiveTransformFeedback(this._getActiveBuffer(target | 0))
+  }
+
+  _allTransformFeedbacks () {
+    const feedbacks = [this._defaultTransformFeedback]
+    for (const id in this._transformFeedbacks) {
+      feedbacks.push(this._transformFeedbacks[id])
+    }
+    return feedbacks
+  }
+
+  _inActiveTransformFeedback (buffer) {
+    if (!buffer) {
+      return false
+    }
+    for (const tf of this._allTransformFeedbacks()) {
+      if (!tf._active) {
+        continue
+      }
+      for (let i = 0; i < tf._bindings.length; ++i) {
+        if (tf._bindings[i] && tf._bindings[i].buffer === buffer) {
+          this.setError(this.INVALID_OPERATION)
+          return true
+        }
+      }
+    }
+    return false
+  }
+
   bufferData (target, data, usage, srcOffset, length) {
+    if (this._boundToActiveTransformFeedback(target)) {
+      return
+    }
     if (arguments.length > 3) {
       data = this._sliceSource(data, srcOffset, length, 'bufferData')
       if (!data) {
@@ -1896,6 +2156,9 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
   }
 
   bufferSubData (target, offset, data, srcOffset, length) {
+    if (this._boundToActiveTransformFeedback(target)) {
+      return
+    }
     if (arguments.length > 3) {
       data = this._sliceSource(data, srcOffset, length, 'bufferSubData')
       if (!data) {
@@ -1941,6 +2204,10 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     if ((readBuffer._binding === this.ELEMENT_ARRAY_BUFFER) !==
       (writeBuffer._binding === this.ELEMENT_ARRAY_BUFFER)) {
       this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (this._inActiveTransformFeedback(readBuffer) || this._inActiveTransformFeedback(writeBuffer)) {
       return
     }
 
