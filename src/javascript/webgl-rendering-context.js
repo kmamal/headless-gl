@@ -328,7 +328,8 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   _resizeDrawingBuffer (width, height) {
-    const prevFramebuffer = this._activeFramebuffers.draw
+    const prevDrawFramebuffer = this._activeFramebuffers.draw
+    const prevReadFramebuffer = this._activeFramebuffers.read
     const prevTexture = this._getActiveTexture(this.TEXTURE_2D)
     const prevRenderbuffer = this._activeRenderbuffer
 
@@ -400,7 +401,12 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
 
     // Restore previous binding state
-    this.bindFramebuffer(this.FRAMEBUFFER, prevFramebuffer)
+    if (prevReadFramebuffer === prevDrawFramebuffer) {
+      this.bindFramebuffer(this.FRAMEBUFFER, prevDrawFramebuffer)
+    } else {
+      this.bindFramebuffer(this.DRAW_FRAMEBUFFER, prevDrawFramebuffer)
+      this.bindFramebuffer(this.READ_FRAMEBUFFER, prevReadFramebuffer)
+    }
     this.bindTexture(this.TEXTURE_2D, prevTexture)
     this.bindRenderbuffer(this.RENDERBUFFER, prevRenderbuffer)
   }
