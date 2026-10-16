@@ -1774,7 +1774,11 @@ GL_METHOD(ReadPixels) {
   GLenum type = Nan::To<int32_t>(info[5]).ToChecked();
   Nan::TypedArrayContents<char> pixels(info[6]);
 
-  glReadPixels(x, y, width, height, format, type, *pixels);
+  GLsizei length = 0;
+  GLsizei columns = 0;
+  GLsizei rows = 0;
+  glReadPixelsRobustANGLE(x, y, width, height, format, type, pixels.length(), &length, &columns,
+                          &rows, *pixels);
 }
 
 GL_METHOD(GetTexParameter) {
