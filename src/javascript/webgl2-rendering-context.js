@@ -1,7 +1,8 @@
 const { gl } = require('./native-gl')
 const { WebGLRenderingContextHelper } = require('./webgl-rendering-context')
 const { WebGLProgram } = require('./webgl-program')
-const { checkObject, isValidString, toIntPtr } = require('./utils')
+const { WebGLBuffer } = require('./webgl-buffer')
+const { checkObject, isValidString, typeSize, toIntPtr } = require('./utils')
 
 const MAX_IDENTIFIER_LENGTH = 1024
 
@@ -282,6 +283,254 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     super.uniformMatrix4x3fv(location._ | 0, !!transpose, value)
   }
 
+  _setIntegerAttrib (index, data) {
+    const attrib = this._vertexGlobalState._attribs[index]
+    attrib._intData = data
+    for (let i = 0; i < 4; ++i) {
+      attrib._data[i] = data[i]
+    }
+  }
+
+  _integerAttribValues (values, Type, name) {
+    if (typeof values !== 'object' || values === null || typeof values.length !== 'number') {
+      throw new TypeError(name + '(GLuint, Array)')
+    }
+    if (values.length < 4) {
+      this.setError(this.INVALID_VALUE)
+      return null
+    }
+    const data = new Type(4)
+    for (let i = 0; i < 4; ++i) {
+      data[i] = values[i]
+    }
+    return data
+  }
+
+  vertexAttribI4i (index, x, y, z, w) {
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
+    const data = new Int32Array([x, y, z, w])
+    this._setIntegerAttrib(index, data)
+    return super.vertexAttribI4i(index, data[0], data[1], data[2], data[3])
+  }
+
+  vertexAttribI4ui (index, x, y, z, w) {
+    index |= 0
+    if (!this._checkVertexIndex(index)) return
+    const data = new Uint32Array([x, y, z, w])
+    this._setIntegerAttrib(index, data)
+    return super.vertexAttribI4ui(index, data[0], data[1], data[2], data[3])
+  }
+
+  vertexAttribI4iv (index, values) {
+    index |= 0
+    const data = this._integerAttribValues(values, Int32Array, 'vertexAttribI4iv')
+    if (!data || !this._checkVertexIndex(index)) return
+    this._setIntegerAttrib(index, data)
+    return super.vertexAttribI4iv(index, data)
+  }
+
+  vertexAttribI4uiv (index, values) {
+    index |= 0
+    const data = this._integerAttribValues(values, Uint32Array, 'vertexAttribI4uiv')
+    if (!data || !this._checkVertexIndex(index)) return
+    this._setIntegerAttrib(index, data)
+    return super.vertexAttribI4uiv(index, data)
+  }
+
+  vertexAttribPointer (
+    index,
+    size,
+    type,
+    normalized,
+    stride,
+    offset) {
+    if (stride < 0 || offset < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    index |= 0
+    size |= 0
+    type |= 0
+    normalized = !!normalized
+    stride |= 0
+    offset = toIntPtr(offset)
+
+    if (stride < 0 ||
+      offset < 0 ||
+      index < 0 || index >= this._vertexObjectState._attribs.length ||
+      !(size === 1 || size === 2 || size === 3 || size === 4)) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if (this._vertexGlobalState._arrayBufferBinding === null && offset !== 0) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    const packed = type === this.INT_2_10_10_10_REV ||
+      type === this.UNSIGNED_INT_2_10_10_10_REV
+    let byteSize = typeSize(type)
+    if (type === this.HALF_FLOAT) {
+      byteSize = 2
+    } else if (packed) {
+      byteSize = 4
+    }
+    if (byteSize === 0) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+
+    if (packed && size !== 4) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (stride > 255 || stride < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if ((stride % byteSize) !== 0 ||
+      (offset % byteSize) !== 0) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    const pointerSize = packed ? 4 : size * byteSize
+
+    gl.vertexAttribPointer.call(this, index, size, type, normalized, stride, offset)
+
+    this._vertexObjectState.setVertexAttribPointer(
+      this._vertexGlobalState._arrayBufferBinding,
+      index,
+      pointerSize,
+      offset,
+      stride || pointerSize,
+      type,
+      normalized,
+      stride,
+      size)
+    this._vertexObjectState._attribs[index]._integer = false
+  }
+
+  vertexAttribIPointer (index, size, type, stride, offset) {
+    if (stride < 0 || offset < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    index |= 0
+    size |= 0
+    type |= 0
+    stride |= 0
+    offset = toIntPtr(offset)
+
+    if (stride < 0 ||
+      offset < 0 ||
+      index < 0 || index >= this._vertexObjectState._attribs.length ||
+      !(size === 1 || size === 2 || size === 3 || size === 4)) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if (this._vertexGlobalState._arrayBufferBinding === null && offset !== 0) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    const byteSize = typeSize(type)
+    if (byteSize === 0 || type === this.FLOAT) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+
+    if (stride > 255 || stride < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if ((stride % byteSize) !== 0 ||
+      (offset % byteSize) !== 0) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    super.vertexAttribIPointer(index, size, type, stride, offset)
+
+    this._vertexObjectState.setVertexAttribPointer(
+      this._vertexGlobalState._arrayBufferBinding,
+      index,
+      size * byteSize,
+      offset,
+      stride || (size * byteSize),
+      type,
+      false,
+      stride,
+      size)
+    this._vertexObjectState._attribs[index]._integer = true
+  }
+
+  vertexAttribDivisor (index, divisor) {
+    index |= 0
+    divisor >>>= 0
+    if (!this._checkVertexIndex(index)) return
+    super.vertexAttribDivisor(index, divisor)
+    this._vertexObjectState._attribs[index]._divisor = divisor
+  }
+
+  getVertexAttrib (index, pname) {
+    index |= 0
+    pname |= 0
+    if (pname === this.VERTEX_ATTRIB_ARRAY_DIVISOR ||
+      pname === this.VERTEX_ATTRIB_ARRAY_INTEGER) {
+      if (!this._checkVertexIndex(index)) return null
+      const attrib = this._vertexObjectState._attribs[index]
+      if (pname === this.VERTEX_ATTRIB_ARRAY_DIVISOR) {
+        return attrib._divisor
+      }
+      return attrib._integer
+    }
+    return super.getVertexAttrib(index, pname)
+  }
+
+  drawArraysInstanced (mode, first, count, instanceCount) {
+    mode |= 0
+    first |= 0
+    count |= 0
+    instanceCount |= 0
+
+    return super.drawArraysInstanced(mode, first, count, instanceCount)
+  }
+
+  drawElementsInstanced (mode, count, type, offset, instanceCount) {
+    mode |= 0
+    count |= 0
+    type |= 0
+    offset = toIntPtr(offset)
+    instanceCount |= 0
+
+    return super.drawElementsInstanced(mode, count, type, offset, instanceCount)
+  }
+
+  drawRangeElements (mode, start, end, count, type, offset) {
+    mode |= 0
+    start |= 0
+    end |= 0
+    count |= 0
+    type |= 0
+    offset = toIntPtr(offset)
+
+    if (end < start) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    return super.drawRangeElements(mode, start, end, count, type, offset)
+  }
+
   readPixels (x, y, width, height, format, type, pixels, dstOffset) {
     if (ArrayBuffer.isView(pixels)) {
       if (arguments.length > 7) {
@@ -290,6 +539,14 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       }
     }
     return super.readPixels(x, y, width, height, format, type, pixels)
+  }
+
+  getParameter (pname) {
+    pname |= 0
+    if (pname === this.VERTEX_ARRAY_BINDING) {
+      return this._activeVertexArrayObject
+    }
+    return super.getParameter(pname)
   }
 
   getUniformLocation (program, name) {

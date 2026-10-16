@@ -18,6 +18,8 @@ class WebGLVertexArrayObjectAttribute {
     this._pointerNormal = false
     this._inputSize = 4
     this._inputStride = 0
+    this._divisor = 0
+    this._integer = false
   }
 }
 
@@ -25,6 +27,7 @@ class WebGLVertexArrayGlobalAttribute {
   constructor (idx) {
     this._idx = idx
     this._data = new Float32Array([0, 0, 0, 1])
+    this._intData = null
   }
 }
 

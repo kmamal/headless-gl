@@ -2766,9 +2766,8 @@ GL_METHOD(VertexAttribI4i) {
 GL_METHOD(VertexAttribI4iv) {
   GL_BOILERPLATE;
   GLuint index = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto values = info[1].As<v8::ArrayBufferView>();
-  GLint *bufferPtr = static_cast<GLint *>(values->Buffer()->GetBackingStore()->Data());
-  glVertexAttribI4iv(index, bufferPtr);
+  Nan::TypedArrayContents<GLint> values(info[1]);
+  glVertexAttribI4iv(index, *values);
 }
 
 GL_METHOD(VertexAttribI4ui) {
@@ -2784,9 +2783,8 @@ GL_METHOD(VertexAttribI4ui) {
 GL_METHOD(VertexAttribI4uiv) {
   GL_BOILERPLATE;
   GLuint index = Nan::To<uint32_t>(info[0]).ToChecked();
-  auto values = info[1].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(values->Buffer()->GetBackingStore()->Data());
-  glVertexAttribI4uiv(index, bufferPtr);
+  Nan::TypedArrayContents<GLuint> values(info[1]);
+  glVertexAttribI4uiv(index, *values);
 }
 
 GL_METHOD(VertexAttribIPointer) {

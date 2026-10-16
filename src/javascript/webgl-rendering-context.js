@@ -1458,7 +1458,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         super.bindBuffer(this.ARRAY_BUFFER, 0)
         detached = true
       }
-      super.vertexAttribPointer(i, attrib._inputSize, attrib._pointerType, attrib._pointerNormal, attrib._inputStride, 0)
+      if (attrib._integer) {
+        super.vertexAttribIPointer(i, attrib._inputSize, attrib._pointerType, attrib._inputStride, 0)
+      } else {
+        super.vertexAttribPointer(i, attrib._inputSize, attrib._pointerType, attrib._pointerNormal, attrib._inputStride, 0)
+      }
     }
     if (detached) {
       const bound = this._vertexGlobalState._arrayBufferBinding
@@ -2321,8 +2325,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         return attrib._pointerType
       case this.VERTEX_ATTRIB_ARRAY_NORMALIZED:
         return attrib._pointerNormal
-      case this.CURRENT_VERTEX_ATTRIB:
-        return new Float32Array(vertexAttribValue)
+      case this.CURRENT_VERTEX_ATTRIB: {
+        const intData = this._vertexGlobalState._attribs[index]._intData
+        return intData ? new intData.constructor(intData) : new Float32Array(vertexAttribValue)
+      }
       default:
         return super.getVertexAttrib(index, pname)
     }
@@ -3169,6 +3175,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[1] = data[2] = 0
     data[0] = v0
@@ -3179,6 +3186,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[2] = 0
     data[1] = v1
@@ -3190,6 +3198,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[2] = v2
     data[1] = v1
@@ -3201,6 +3210,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = v3
     data[2] = v2
     data[1] = v1
@@ -3216,6 +3226,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[2] = 0
     data[1] = 0
@@ -3231,6 +3242,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[2] = 0
     data[1] = value[1]
@@ -3246,6 +3258,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = 1
     data[2] = value[2]
     data[1] = value[1]
@@ -3261,6 +3274,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     index |= 0
     if (!this._checkVertexIndex(index)) return
     const data = this._vertexGlobalState._attribs[index]._data
+    this._vertexGlobalState._attribs[index]._intData = null
     data[3] = value[3]
     data[2] = value[2]
     data[1] = value[1]
