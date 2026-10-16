@@ -2907,7 +2907,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       typeof value !== 'object' ||
       value === null ||
       !value.length ||
-      value.length % count * count !== 0) {
+      value.length % (count * count) !== 0) {
       this.setError(this.INVALID_VALUE)
       return false
     }
@@ -2923,7 +2923,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     } else if (location._array) {
       return true
     }
-    this.setError(this.INVALID_VALUE)
+    this.setError(this.INVALID_OPERATION)
     return false
   }
 
