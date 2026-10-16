@@ -82,7 +82,7 @@ class WebGLVertexArrayObjectState {
       if (attrib._pointerBuffer === buffer) {
         attrib._pointerBuffer._refCount -= 1
         attrib._pointerBuffer._checkDelete()
-        attrib._clear()
+        attrib._pointerBuffer = null
       }
     }
   }

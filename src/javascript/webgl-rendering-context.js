@@ -1271,14 +1271,31 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       this.bindBuffer(this.ELEMENT_ARRAY_BUFFER, null)
     }
 
-    if (this._vertexObjectState === this._defaultVertexObjectState) {
-      // If no vertex array object is bound, release attrib bindings for the
-      // array buffer.
-      this._vertexObjectState.releaseArrayBuffer(buffer)
-    }
+    this._detachArrayBuffer(buffer)
+    this._vertexObjectState.releaseArrayBuffer(buffer)
 
     buffer._pendingDelete = true
     buffer._checkDelete()
+  }
+
+  _detachArrayBuffer (buffer) {
+    const attribs = this._vertexObjectState._attribs
+    let detached = false
+    for (let i = 0; i < attribs.length; ++i) {
+      const attrib = attribs[i]
+      if (attrib._pointerBuffer !== buffer) {
+        continue
+      }
+      if (!detached) {
+        super.bindBuffer(this.ARRAY_BUFFER, 0)
+        detached = true
+      }
+      super.vertexAttribPointer(i, attrib._inputSize, attrib._pointerType, attrib._pointerNormal, attrib._inputStride, 0)
+    }
+    if (detached) {
+      const bound = this._vertexGlobalState._arrayBufferBinding
+      super.bindBuffer(this.ARRAY_BUFFER, bound ? bound._ | 0 : 0)
+    }
   }
 
   deleteFramebuffer (framebuffer) {
