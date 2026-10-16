@@ -1243,15 +1243,19 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       object._checkDelete()
       return
     }
-    if (object !== null) {
+    if (object) {
       this.setError(this.INVALID_OPERATION)
     }
   }
 
   deleteBuffer (buffer) {
     if (!checkObject(buffer) ||
-      (buffer !== null && !(buffer instanceof WebGLBuffer))) {
+      (buffer && !(buffer instanceof WebGLBuffer))) {
       throw new TypeError('deleteBuffer(WebGLBuffer)')
+    }
+
+    if (!buffer) {
+      return
     }
 
     if (!(buffer instanceof WebGLBuffer &&
@@ -1280,6 +1284,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   deleteFramebuffer (framebuffer) {
     if (!checkObject(framebuffer)) {
       throw new TypeError('deleteFramebuffer(WebGLFramebuffer)')
+    }
+
+    if (!framebuffer) {
+      return
     }
 
     if (!(framebuffer instanceof WebGLFramebuffer &&
@@ -1316,6 +1324,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   deleteRenderbuffer (renderbuffer) {
     if (!checkObject(renderbuffer)) {
       throw new TypeError('deleteRenderbuffer(WebGLRenderbuffer)')
+    }
+
+    if (!renderbuffer) {
+      return
     }
 
     if (!(renderbuffer instanceof WebGLRenderbuffer &&
@@ -1375,6 +1387,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   deleteVertexArray (array) {
     if (!checkObject(array)) {
       throw new TypeError('deleteVertexArray(WebGLVertexArrayObject)')
+    }
+
+    if (!array) {
+      return
     }
 
     if (!(array instanceof WebGLVertexArrayObject &&
