@@ -1,4 +1,4 @@
-const { gl } = require('./native-gl')
+const { gl, NativeWebGL } = require('./native-gl')
 const { WebGLRenderingContextHelper } = require('./webgl-rendering-context')
 const { WebGLProgram } = require('./webgl-program')
 const { WebGLBuffer } = require('./webgl-buffer')
@@ -2298,6 +2298,18 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
 
     return super.getIndexedParameter(target, index)
   }
+}
+
+for (const [key, value] of Object.entries(gl)) {
+  if (typeof value !== 'number') {
+    continue
+  }
+  Object.assign(WebGL2RenderingContext, { [key]: value })
+}
+
+for (const [key, value] of Object.entries(NativeWebGL.WebGL2Constants)) {
+  WebGL2RenderingContext.prototype[key] = value
+  Object.assign(WebGL2RenderingContext, { [key]: value })
 }
 
 module.exports = { WebGL2RenderingContext }

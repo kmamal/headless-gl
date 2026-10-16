@@ -538,7 +538,7 @@ GL_METHOD(New) {
   instance->Wrap(info.This());
 
   if (createWebGL2Context) {
-    BindWebGL2(info);
+    BindWebGL2(info.This());
   }
 
   info.GetReturnValue().Set(info.This());

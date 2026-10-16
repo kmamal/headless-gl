@@ -373,6 +373,6 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(BindVertexArray);
 };
 
-void BindWebGL2(const Nan::FunctionCallbackInfo<v8::Value> &info);
+void BindWebGL2(v8::Local<v8::Object> target);
 
 #endif

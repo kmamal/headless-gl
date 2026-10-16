@@ -19,7 +19,7 @@ Nan::Persistent<v8::FunctionTemplate> WEBGL_TEMPLATE;
 #define JS_GL_CONSTANT(name) JS_CONSTANT(name, GL_##name)
 
 #define JS_SET_CONSTANT(name, v)                                                                   \
-  Nan::Set(info.This(), Nan::New(#name).ToLocalChecked(), Nan::New(v))
+  Nan::Set(target, Nan::New(#name).ToLocalChecked(), Nan::New(v))
 
 #define JS_SET_GL_CONSTANT(name) JS_SET_CONSTANT(name, GL_##name)
 
@@ -548,7 +548,6 @@ NAN_MODULE_INIT(Init) {
   JS_GL_CONSTANT(INVALID_FRAMEBUFFER_OPERATION);
 
   /* WebGL-specific enums */
-  JS_CONSTANT(STENCIL_INDEX, 0x1901);
   JS_CONSTANT(UNPACK_FLIP_Y_WEBGL, 0x9240);
   JS_CONSTANT(UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0x9241);
   JS_CONSTANT(CONTEXT_LOST_WEBGL, 0x9242);
@@ -564,11 +563,15 @@ NAN_MODULE_INIT(Init) {
            Nan::GetFunction(webgl_template).ToLocalChecked());
 
   // Export helper methods for clean up and error handling
+  v8::Local<v8::Object> webgl2Constants = Nan::New<v8::Object>();
+  BindWebGL2(webgl2Constants);
+  Nan::Set(target, Nan::New<v8::String>("WebGL2Constants").ToLocalChecked(), webgl2Constants);
+
   Nan::Export(target, "cleanup", WebGLRenderingContext::DisposeAll);
   Nan::Export(target, "setError", WebGLRenderingContext::SetError);
 }
 
-void BindWebGL2(const Nan::FunctionCallbackInfo<v8::Value> &info) {
+void BindWebGL2(v8::Local<v8::Object> target) {
   /* ES3 enums */
   JS_SET_GL_CONSTANT(READ_BUFFER);
   JS_SET_GL_CONSTANT(UNPACK_ROW_LENGTH);

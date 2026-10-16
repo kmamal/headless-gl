@@ -19,12 +19,14 @@ const UNSIGNED_INT_SAMPLER_3D = 0x8DD3
 const UNSIGNED_INT_SAMPLER_CUBE = 0x8DD4
 const UNSIGNED_INT_SAMPLER_2D_ARRAY = 0x8DD7
 
-function bindPublics (props, wrapper, privateInstance, privateMethods) {
+function bindPublics (props, wrapper, privateInstance, privateMethods, hiddenProto) {
   for (let i = 0; i < props.length; i++) {
     const prop = props[i]
     const value = privateInstance[prop]
     if (typeof value === 'function') {
-      if (privateMethods.indexOf(prop) === -1) {
+      if (prop[0] === '_') {
+        hiddenProto[prop] = value.bind(privateInstance)
+      } else if (privateMethods.indexOf(prop) === -1) {
         wrapper[prop] = value.bind(privateInstance)
       }
     } else {

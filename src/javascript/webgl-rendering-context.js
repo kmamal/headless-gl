@@ -72,21 +72,62 @@ const availableExtensions = {
 
 const privateMethods = [
   'constructor',
-  'resize',
-  'destroy',
-  'getUniformuiv'
+  'setError',
+  'getUniformuiv',
+  'getUniformiv'
+]
+
+const webgl1OnlyMethods = [
+  'drawBuffersWEBGL',
+  'extWEBGL_draw_buffers',
+  'createVertexArrayOES',
+  'deleteVertexArrayOES',
+  'isVertexArrayOES',
+  'bindVertexArrayOES'
+]
+
+const webgl2OnlyMethods = [
+  'beginQuery', 'beginTransformFeedback', 'bindBufferBase', 'bindBufferRange', 'bindSampler',
+  'bindTransformFeedback', 'bindVertexArray', 'blitFramebuffer', 'clearBufferfi', 'clearBufferfv',
+  'clearBufferiv', 'clearBufferuiv', 'clientWaitSync', 'compressedTexImage3D',
+  'compressedTexSubImage3D', 'copyBufferSubData', 'copyTexSubImage3D', 'createQuery',
+  'createSampler', 'createTransformFeedback', 'createVertexArray', 'deleteQuery', 'deleteSampler',
+  'deleteSync', 'deleteTransformFeedback', 'deleteVertexArray', 'drawArraysInstanced',
+  'drawBuffers', 'drawElementsInstanced', 'drawRangeElements', 'endQuery', 'endTransformFeedback',
+  'fenceSync', 'framebufferTextureLayer', 'getActiveUniformBlockName',
+  'getActiveUniformBlockParameter', 'getActiveUniforms', 'getBufferSubData', 'getFragDataLocation',
+  'getIndexedParameter', 'getInternalformatParameter', 'getQuery', 'getQueryParameter',
+  'getSamplerParameter', 'getSyncParameter', 'getTransformFeedbackVarying', 'getUniformBlockIndex',
+  'getUniformIndices', 'invalidateFramebuffer', 'invalidateSubFramebuffer', 'isQuery', 'isSampler',
+  'isSync', 'isTransformFeedback', 'isVertexArray', 'pauseTransformFeedback', 'readBuffer',
+  'renderbufferStorageMultisample', 'resumeTransformFeedback', 'samplerParameterf',
+  'samplerParameteri', 'texImage3D', 'texStorage2D', 'texStorage3D', 'texSubImage3D',
+  'transformFeedbackVaryings', 'uniform1ui', 'uniform1uiv', 'uniform2ui', 'uniform2uiv',
+  'uniform3ui', 'uniform3uiv', 'uniform4ui', 'uniform4uiv', 'uniformBlockBinding',
+  'uniformMatrix2x3fv', 'uniformMatrix2x4fv', 'uniformMatrix3x2fv', 'uniformMatrix3x4fv',
+  'uniformMatrix4x2fv', 'uniformMatrix4x3fv', 'vertexAttribDivisor', 'vertexAttribI4i',
+  'vertexAttribI4iv', 'vertexAttribI4ui', 'vertexAttribI4uiv', 'vertexAttribIPointer', 'waitSync'
 ]
 
 function wrapContext (ctx) {
   const wrapper = new ctx.constructor()
+  const hiddenProto = Object.create(Object.getPrototypeOf(wrapper))
+  Object.setPrototypeOf(wrapper, hiddenProto)
 
+  const masked = ctx._isWebGL2() ? webgl1OnlyMethods : webgl2OnlyMethods
+  const hidden = privateMethods.concat(masked)
   let proto = ctx
   while (proto && proto !== Object.prototype) {
-    bindPublics(Object.keys(proto), wrapper, ctx, privateMethods)
-    bindPublics(Object.keys(proto.constructor.prototype), wrapper, ctx, privateMethods)
-    bindPublics(Object.getOwnPropertyNames(proto), wrapper, ctx, privateMethods)
-    bindPublics(Object.getOwnPropertyNames(proto.constructor.prototype), wrapper, ctx, privateMethods)
+    bindPublics(Object.keys(proto), wrapper, ctx, hidden, hiddenProto)
+    bindPublics(Object.keys(proto.constructor.prototype), wrapper, ctx, hidden, hiddenProto)
+    bindPublics(Object.getOwnPropertyNames(proto), wrapper, ctx, hidden, hiddenProto)
+    bindPublics(Object.getOwnPropertyNames(proto.constructor.prototype), wrapper, ctx, hidden, hiddenProto)
     proto = Object.getPrototypeOf(proto)
+  }
+  for (const name of hidden) {
+    if (name !== 'constructor' && !Object.hasOwn(wrapper, name)) {
+      Object.defineProperty(hiddenProto, name, { value: undefined, writable: true, configurable: true })
+    }
   }
 
   Object.defineProperties(wrapper, {
