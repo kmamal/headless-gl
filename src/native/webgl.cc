@@ -116,17 +116,6 @@ GLenum SizeFloatingPointFormat(GLenum format) {
   return format;
 }
 
-GLenum OverrideDrawBufferEnum(GLenum buffer) {
-  switch (buffer) {
-  case GL_BACK:
-    return GL_COLOR_ATTACHMENT0;
-  case GL_DEPTH:
-    return GL_DEPTH_ATTACHMENT;
-  case GL_STENCIL:
-    return GL_STENCIL_ATTACHMENT;
-  }
-}
-
 std::set<std::string> GetStringSetFromCString(const char *cstr) {
   std::set<std::string> result;
   std::istringstream iss(cstr); // Create an input string stream
@@ -2485,7 +2474,7 @@ GL_METHOD(InvalidateSubFramebuffer) {
 
 GL_METHOD(ReadBuffer) {
   GL_BOILERPLATE;
-  GLenum src = OverrideDrawBufferEnum(Nan::To<int32_t>(info[0]).ToChecked());
+  GLenum src = Nan::To<int32_t>(info[0]).ToChecked();
   glReadBuffer(src);
 }
 
@@ -2843,8 +2832,7 @@ GL_METHOD(DrawBuffers) {
   GLsizei count = buffers->Length();
   GLenum *bufferList = new GLenum[count];
   for (GLsizei i = 0; i < count; i++) {
-    GLenum buffer = Nan::To<int32_t>(Nan::Get(buffers, i).ToLocalChecked()).ToChecked();
-    bufferList[i] = OverrideDrawBufferEnum(buffer);
+    bufferList[i] = Nan::To<int32_t>(Nan::Get(buffers, i).ToLocalChecked()).ToChecked();
   }
   glDrawBuffers(count, bufferList);
   delete[] bufferList;
@@ -2854,27 +2842,24 @@ GL_METHOD(ClearBufferfv) {
   GL_BOILERPLATE;
   GLenum buffer = Nan::To<int32_t>(info[0]).ToChecked();
   GLint drawbuffer = Nan::To<int32_t>(info[1]).ToChecked();
-  auto values = info[2].As<v8::ArrayBufferView>();
-  GLfloat *bufferPtr = static_cast<GLfloat *>(values->Buffer()->GetBackingStore()->Data());
-  glClearBufferfv(buffer, drawbuffer, bufferPtr);
+  Nan::TypedArrayContents<GLfloat> values(info[2]);
+  glClearBufferfv(buffer, drawbuffer, *values);
 }
 
 GL_METHOD(ClearBufferiv) {
   GL_BOILERPLATE;
   GLenum buffer = Nan::To<int32_t>(info[0]).ToChecked();
   GLint drawbuffer = Nan::To<int32_t>(info[1]).ToChecked();
-  auto values = info[2].As<v8::ArrayBufferView>();
-  GLint *bufferPtr = static_cast<GLint *>(values->Buffer()->GetBackingStore()->Data());
-  glClearBufferiv(buffer, drawbuffer, bufferPtr);
+  Nan::TypedArrayContents<GLint> values(info[2]);
+  glClearBufferiv(buffer, drawbuffer, *values);
 }
 
 GL_METHOD(ClearBufferuiv) {
   GL_BOILERPLATE;
   GLenum buffer = Nan::To<int32_t>(info[0]).ToChecked();
   GLint drawbuffer = Nan::To<int32_t>(info[1]).ToChecked();
-  auto values = info[2].As<v8::ArrayBufferView>();
-  GLuint *bufferPtr = static_cast<GLuint *>(values->Buffer()->GetBackingStore()->Data());
-  glClearBufferuiv(buffer, drawbuffer, bufferPtr);
+  Nan::TypedArrayContents<GLuint> values(info[2]);
+  glClearBufferuiv(buffer, drawbuffer, *values);
 }
 
 GL_METHOD(ClearBufferfi) {

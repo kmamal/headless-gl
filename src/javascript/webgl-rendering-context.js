@@ -344,6 +344,19 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return null
   }
 
+  _setAttachment (target, attachment, object) {
+    const framebuffer = this._getActiveFramebuffer(target)
+    if (!framebuffer) {
+      return
+    }
+    if (this._isWebGL2() && attachment === this.DEPTH_STENCIL_ATTACHMENT) {
+      framebuffer._attachments[this.DEPTH_ATTACHMENT] = object || null
+      framebuffer._attachments[this.STENCIL_ATTACHMENT] = object || null
+    } else {
+      framebuffer._attachments[attachment] = object || null
+    }
+  }
+
   _getActiveFramebuffer (target) {
     if (target === this.READ_FRAMEBUFFER) {
       return this._activeFramebuffers.read
@@ -369,6 +382,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return this._getActiveTexture(this.TEXTURE_CUBE_MAP)
     }
     return this._getActiveTexture(target)
+  }
+
+  _isFramebufferTarget (target) {
+    return target === this.FRAMEBUFFER ||
+      (this._isWebGL2() && (target === 0x8CA8 || target === 0x8CA9))
   }
 
   _getTexImage (target) {
@@ -678,6 +696,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       error = super.getError()
       this._restoreError(error)
     } else if (framebuffer._pendingDelete) {
+      if (this._isWebGL2()) {
+        this.setError(this.INVALID_OPERATION)
+      }
       return
     } else if (this._checkWrapper(framebuffer, WebGLFramebuffer)) {
       this._saveError()
@@ -841,6 +862,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         target | 0,
         0)
     } else if (object._pendingDelete) {
+      if (this._isWebGL2()) {
+        this.setError(this.INVALID_OPERATION)
+      }
       return
     } else if (this._checkWrapper(object, WebGLRenderbuffer)) {
       super.bindRenderbuffer(
@@ -1727,6 +1751,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       throw new TypeError('framebufferRenderbuffer(GLenum, GLenum, GLenum, WebGLRenderbuffer)')
     }
 
+    if (!this._isFramebufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
     // Since we emulate the default framebuffer, we can't rely on ANGLE's validation.
     if (!this._getActiveFramebuffer(target)) {
       this.setError(this.INVALID_OPERATION)
@@ -1737,7 +1765,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return
     }
 
+    this._saveError()
     super.framebufferRenderbuffer(target, attachment, renderbufferTarget, renderbuffer?._ ?? null)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      this._setAttachment(target, attachment, renderbuffer)
+    }
   }
 
   framebufferTexture2D (
@@ -1759,13 +1793,23 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return
     }
 
+    if (!this._isFramebufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
     // Since we emulate the default framebuffer, we can't rely on ANGLE's validation.
     if (!this._getActiveFramebuffer(target)) {
       this.setError(this.INVALID_OPERATION)
       return
     }
 
+    this._saveError()
     super.framebufferTexture2D(target, attachment, textarget, texture?._ ?? null, level)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      this._setAttachment(target, attachment, texture)
+    }
   }
 
   framebufferTextureLayer (target, attachment, texture, level, layer) {
@@ -1782,13 +1826,23 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       return
     }
 
+    if (!this._isFramebufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
     // Since we emulate the default framebuffer, we can't rely on ANGLE's validation.
     if (!this._getActiveFramebuffer(target)) {
       this.setError(this.INVALID_OPERATION)
       return
     }
 
+    this._saveError()
     super.framebufferTextureLayer(target, attachment, texture?._ ?? null, level, layer)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      this._setAttachment(target, attachment, texture)
+    }
   }
 
   frontFace (mode) {
@@ -1984,11 +2038,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
     if (error === this.NO_ERROR && pname === this.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME) {
       const type = super.getFramebufferAttachmentParameter(target, attachment, this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE)
-      if (type === this.RENDERBUFFER) {
-        return this._renderbuffers[result]
-      } else {
-        return this._textures[result]
+      if (type !== this.RENDERBUFFER && type !== this.TEXTURE) {
+        return null
       }
+      return this._getActiveFramebuffer(target)._attachments[attachment] || null
     }
 
     return result
@@ -2532,6 +2585,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     renderbuffer._width = width
     renderbuffer._height = height
     renderbuffer._format = internalFormat
+    renderbuffer._samples = 0
   }
 
   resize (width, height) {

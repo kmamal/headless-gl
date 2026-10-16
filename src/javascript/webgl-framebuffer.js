@@ -10,6 +10,9 @@ class WebGLFramebuffer extends Linkable {
     this._width = 0
     this._height = 0
     this._status = null
+    this._readBuffer = gl.COLOR_ATTACHMENT0
+    this._drawBuffers = [gl.COLOR_ATTACHMENT0]
+    this._attachments = {}
   }
 
   _performDelete () {

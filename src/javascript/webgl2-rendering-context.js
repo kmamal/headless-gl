@@ -531,6 +531,481 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     return super.drawRangeElements(mode, start, end, count, type, offset)
   }
 
+  _defaultFramebufferAttachment (attachment) {
+    switch (attachment) {
+      case this.BACK:
+      case this.COLOR:
+        return this.COLOR_ATTACHMENT0
+      case this.DEPTH:
+        return this.DEPTH_ATTACHMENT
+      case this.STENCIL:
+        return this.STENCIL_ATTACHMENT
+    }
+    return attachment
+  }
+
+  _colorAttachmentIndex (attachment) {
+    const index = attachment - this.COLOR_ATTACHMENT0
+    if (index >= 0 && index < 16) {
+      return index
+    }
+    return -1
+  }
+
+  _checkAttachmentPoint (attachment) {
+    const index = this._colorAttachmentIndex(attachment | 0)
+    if (index >= this._maxColorAttachments) {
+      this.setError(this.INVALID_ENUM)
+      return false
+    }
+    return true
+  }
+
+  framebufferTexture2D (target, attachment, textarget, texture, level) {
+    if (!this._checkAttachmentPoint(attachment)) return
+    return super.framebufferTexture2D(target, attachment, textarget, texture, level)
+  }
+
+  framebufferRenderbuffer (target, attachment, renderbufferTarget, renderbuffer) {
+    if (!this._checkAttachmentPoint(attachment)) return
+    return super.framebufferRenderbuffer(target, attachment, renderbufferTarget, renderbuffer)
+  }
+
+  framebufferTextureLayer (target, attachment, texture, level, layer) {
+    if (!this._checkAttachmentPoint(attachment)) return
+    return super.framebufferTextureLayer(target, attachment, texture, level, layer)
+  }
+
+  _checkFramebufferTarget (target) {
+    if (target !== this.FRAMEBUFFER &&
+      target !== this.READ_FRAMEBUFFER &&
+      target !== this.DRAW_FRAMEBUFFER) {
+      this.setError(this.INVALID_ENUM)
+      return false
+    }
+    return true
+  }
+
+  _clearBufferValues (Type, values, srcOffset, name) {
+    if (typeof values !== 'object' || values === null || typeof values.length !== 'number') {
+      throw new TypeError(name + '(GLenum, GLint, Array, GLuint)')
+    }
+    srcOffset |= 0
+    if (srcOffset < 0 || srcOffset > values.length) {
+      this.setError(this.INVALID_VALUE)
+      return null
+    }
+    const data = values instanceof Type ? values : Type.from(values)
+    return srcOffset ? data.subarray(srcOffset) : data
+  }
+
+  _checkClearBuffer (buffer, drawbuffer, allowed, data) {
+    if (allowed.indexOf(buffer) < 0) {
+      this.setError(this.INVALID_ENUM)
+      return false
+    }
+    const max = buffer === this.COLOR ? this._maxDrawBuffers : 1
+    if (drawbuffer < 0 || drawbuffer >= max) {
+      this.setError(this.INVALID_VALUE)
+      return false
+    }
+    if (data && data.length < (buffer === this.COLOR ? 4 : 1)) {
+      this.setError(this.INVALID_VALUE)
+      return false
+    }
+    return true
+  }
+
+  clearBufferfv (buffer, drawbuffer, values, srcOffset) {
+    buffer |= 0
+    drawbuffer |= 0
+    const data = this._clearBufferValues(Float32Array, values, srcOffset, 'clearBufferfv')
+    if (!data) return
+    if (!this._checkClearBuffer(buffer, drawbuffer, [this.COLOR, this.DEPTH], data)) return
+    super.clearBufferfv(buffer, drawbuffer, data)
+  }
+
+  clearBufferiv (buffer, drawbuffer, values, srcOffset) {
+    buffer |= 0
+    drawbuffer |= 0
+    const data = this._clearBufferValues(Int32Array, values, srcOffset, 'clearBufferiv')
+    if (!data) return
+    if (!this._checkClearBuffer(buffer, drawbuffer, [this.COLOR, this.STENCIL], data)) return
+    super.clearBufferiv(buffer, drawbuffer, data)
+  }
+
+  clearBufferuiv (buffer, drawbuffer, values, srcOffset) {
+    buffer |= 0
+    drawbuffer |= 0
+    const data = this._clearBufferValues(Uint32Array, values, srcOffset, 'clearBufferuiv')
+    if (!data) return
+    if (!this._checkClearBuffer(buffer, drawbuffer, [this.COLOR], data)) return
+    super.clearBufferuiv(buffer, drawbuffer, data)
+  }
+
+  clearBufferfi (buffer, drawbuffer, depth, stencil) {
+    buffer |= 0
+    drawbuffer |= 0
+    if (!this._checkClearBuffer(buffer, drawbuffer, [this.DEPTH_STENCIL])) return
+    super.clearBufferfi(buffer, drawbuffer, +depth, stencil | 0)
+  }
+
+  readBuffer (src) {
+    src |= 0
+    const index = this._colorAttachmentIndex(src)
+    if (src !== this.NONE && src !== this.BACK && index < 0) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    const framebuffer = this._activeFramebuffers.read
+    if (framebuffer) {
+      if (src === this.BACK || index >= this._maxColorAttachments) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+      super.readBuffer(src)
+      framebuffer._readBuffer = src
+    } else {
+      if (index >= 0) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+      super.readBuffer(this._defaultFramebufferAttachment(src))
+      this._defaultReadBuffer = src
+    }
+  }
+
+  drawBuffers (buffers) {
+    if (!Array.isArray(buffers)) {
+      throw new TypeError('drawBuffers(Array)')
+    }
+    const list = new Array(buffers.length)
+    for (let i = 0; i < buffers.length; ++i) {
+      list[i] = buffers[i] | 0
+      if (list[i] !== this.NONE && list[i] !== this.BACK && this._colorAttachmentIndex(list[i]) < 0) {
+        this.setError(this.INVALID_ENUM)
+        return
+      }
+    }
+    const framebuffer = this._activeFramebuffers.draw
+    if (framebuffer) {
+      if (list.length > this._maxDrawBuffers) {
+        this.setError(this.INVALID_VALUE)
+        return
+      }
+      for (let i = 0; i < list.length; ++i) {
+        if (list[i] !== this.NONE && list[i] !== this.COLOR_ATTACHMENT0 + i) {
+          this.setError(this.INVALID_OPERATION)
+          return
+        }
+      }
+      super.drawBuffers(list)
+      framebuffer._drawBuffers = list
+    } else {
+      if (list.length !== 1 || (list[0] !== this.BACK && list[0] !== this.NONE)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+      super.drawBuffers([this._defaultFramebufferAttachment(list[0])])
+      this._defaultDrawBuffer = list[0]
+    }
+  }
+
+  blitFramebuffer (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter) {
+    mask |= 0
+    filter |= 0
+    if (mask & ~(this.COLOR_BUFFER_BIT | this.DEPTH_BUFFER_BIT | this.STENCIL_BUFFER_BIT)) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+    if (filter !== this.NEAREST && filter !== this.LINEAR) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (filter === this.LINEAR && (mask & (this.DEPTH_BUFFER_BIT | this.STENCIL_BUFFER_BIT))) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.blitFramebuffer(
+      srcX0 | 0, srcY0 | 0, srcX1 | 0, srcY1 | 0,
+      dstX0 | 0, dstY0 | 0, dstX1 | 0, dstY1 | 0,
+      mask, filter)
+  }
+
+  renderbufferStorageMultisample (target, samples, internalFormat, width, height) {
+    target |= 0
+    samples |= 0
+    internalFormat |= 0
+    width |= 0
+    height |= 0
+
+    if (target !== this.RENDERBUFFER) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+
+    const renderbuffer = this._activeRenderbuffer
+    if (!renderbuffer) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (samples < 0 || width < 0 || height < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+
+    if (internalFormat === this.DEPTH_STENCIL && samples > 0) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    const storage = internalFormat === this.DEPTH_STENCIL ? this.DEPTH24_STENCIL8 : internalFormat
+
+    this._saveError()
+    super.renderbufferStorageMultisample(target, samples, storage, width, height)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error !== this.NO_ERROR) {
+      return
+    }
+
+    renderbuffer._width = width
+    renderbuffer._height = height
+    renderbuffer._format = internalFormat
+    renderbuffer._samples = gl.getRenderbufferParameter.call(this, target, this.RENDERBUFFER_SAMPLES)
+  }
+
+  getRenderbufferParameter (target, pname) {
+    if ((pname | 0) === this.RENDERBUFFER_SAMPLES) {
+      if ((target | 0) !== this.RENDERBUFFER) {
+        this.setError(this.INVALID_ENUM)
+        return null
+      }
+      if (!this._activeRenderbuffer) {
+        this.setError(this.INVALID_OPERATION)
+        return null
+      }
+      return this._activeRenderbuffer._samples
+    }
+    return super.getRenderbufferParameter(target, pname)
+  }
+
+  _invalidateAttachments (target, attachments, name) {
+    if (!Array.isArray(attachments)) {
+      throw new TypeError(name + '(GLenum, Array)')
+    }
+    if (!this._checkFramebufferTarget(target)) {
+      return null
+    }
+    const framebuffer = this._getActiveFramebuffer(target)
+    const list = new Array(attachments.length)
+    for (let i = 0; i < attachments.length; ++i) {
+      const attachment = attachments[i] | 0
+      if (framebuffer) {
+        const index = this._colorAttachmentIndex(attachment)
+        if (index >= 0) {
+          if (index >= this._maxColorAttachments) {
+            this.setError(this.INVALID_OPERATION)
+            return null
+          }
+        } else if (attachment !== this.DEPTH_ATTACHMENT &&
+          attachment !== this.STENCIL_ATTACHMENT &&
+          attachment !== this.DEPTH_STENCIL_ATTACHMENT) {
+          this.setError(this.INVALID_ENUM)
+          return null
+        }
+        list[i] = attachment
+      } else {
+        if (attachment !== this.COLOR &&
+          attachment !== this.DEPTH &&
+          attachment !== this.STENCIL) {
+          this.setError(this.INVALID_ENUM)
+          return null
+        }
+        list[i] = this._defaultFramebufferAttachment(attachment)
+      }
+    }
+    return list
+  }
+
+  invalidateFramebuffer (target, attachments) {
+    target |= 0
+    const list = this._invalidateAttachments(target, attachments, 'invalidateFramebuffer')
+    if (!list) return
+    super.invalidateFramebuffer(target, list)
+  }
+
+  invalidateSubFramebuffer (target, attachments, x, y, width, height) {
+    target |= 0
+    x |= 0
+    y |= 0
+    width |= 0
+    height |= 0
+    const list = this._invalidateAttachments(target, attachments, 'invalidateSubFramebuffer')
+    if (!list) return
+    if (width < 0 || height < 0) {
+      this.setError(this.INVALID_VALUE)
+      return
+    }
+    super.invalidateSubFramebuffer(target, list, x, y, width, height)
+  }
+
+  getFramebufferAttachmentParameter (target, attachment, pname) {
+    target |= 0
+    attachment |= 0
+    pname |= 0
+
+    if (!this._checkFramebufferTarget(target)) {
+      return null
+    }
+    const framebuffer = this._getActiveFramebuffer(target)
+    if (framebuffer) {
+      if (attachment !== this.DEPTH_ATTACHMENT &&
+        attachment !== this.STENCIL_ATTACHMENT &&
+        attachment !== this.DEPTH_STENCIL_ATTACHMENT &&
+        !(this._colorAttachmentIndex(attachment) >= 0 && this._colorAttachmentIndex(attachment) < this._maxColorAttachments)) {
+        this.setError(this.INVALID_ENUM)
+        return null
+      }
+      if (attachment === this.DEPTH_STENCIL_ATTACHMENT) {
+        const depth = this._attachmentObject(target, this.DEPTH_ATTACHMENT)
+        const stencil = this._attachmentObject(target, this.STENCIL_ATTACHMENT)
+        if (depth.type !== stencil.type || depth.object !== stencil.object ||
+          (depth.type !== this.NONE && pname === this.FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE)) {
+          this.setError(this.INVALID_OPERATION)
+          return null
+        }
+        attachment = this.DEPTH_ATTACHMENT
+      }
+      if (pname !== this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE &&
+        pname !== this.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME &&
+        this._attachmentObject(target, attachment).type === this.NONE) {
+        this.setError(this.INVALID_OPERATION)
+        return null
+      }
+      if (!this._isAttachmentParameter(pname)) {
+        this.setError(this.INVALID_ENUM)
+        return null
+      }
+      return super.getFramebufferAttachmentParameter(target, attachment, pname)
+    }
+
+    if (attachment !== this.BACK &&
+      attachment !== this.DEPTH &&
+      attachment !== this.STENCIL) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
+
+    switch (pname) {
+      case this.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_LAYER:
+        this.setError(this.INVALID_ENUM)
+        return null
+    }
+
+    const nativeAttachment = this._defaultFramebufferAttachment(attachment)
+    this._saveError()
+    const type = gl.getFramebufferAttachmentParameter.call(this, target, nativeAttachment, this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE)
+    let result = type
+    if (pname === this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE) {
+      if (type !== this.NONE) {
+        result = this.FRAMEBUFFER_DEFAULT
+      }
+    } else if (type === this.NONE) {
+      result = null
+      this.setError(this.INVALID_OPERATION)
+    } else {
+      result = gl.getFramebufferAttachmentParameter.call(this, target, nativeAttachment, pname)
+    }
+    const error = gl.getError.call(this)
+    this._restoreError(error)
+    return error ? null : result
+  }
+
+  _isRenderbufferFormat (internalFormat) {
+    switch (internalFormat) {
+      case this.R8:
+      case this.R8UI:
+      case this.R8I:
+      case this.R16UI:
+      case this.R16I:
+      case this.R32UI:
+      case this.R32I:
+      case this.RG8:
+      case this.RG8UI:
+      case this.RG8I:
+      case this.RG16UI:
+      case this.RG16I:
+      case this.RG32UI:
+      case this.RG32I:
+      case this.RGB8:
+      case this.RGBA8:
+      case this.SRGB8_ALPHA8:
+      case this.RGB10_A2:
+      case this.RGBA8UI:
+      case this.RGBA8I:
+      case this.RGB10_A2UI:
+      case this.RGBA16UI:
+      case this.RGBA16I:
+      case this.RGBA32I:
+      case this.RGBA32UI:
+      case this.RGB565:
+      case this.RGBA4:
+      case this.RGB5_A1:
+      case this.DEPTH_COMPONENT16:
+      case this.DEPTH_COMPONENT24:
+      case this.DEPTH_COMPONENT32F:
+      case this.DEPTH24_STENCIL8:
+      case this.DEPTH32F_STENCIL8:
+      case this.STENCIL_INDEX8:
+        return true
+      case this.R16F:
+      case this.RG16F:
+      case this.RGBA16F:
+      case this.R32F:
+      case this.RG32F:
+      case this.RGBA32F:
+      case this.R11F_G11F_B10F:
+        return Boolean(this._extensions.ext_color_buffer_float)
+    }
+    return false
+  }
+
+  _isAttachmentParameter (pname) {
+    switch (pname) {
+      case this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
+      case this.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE:
+      case this.FRAMEBUFFER_ATTACHMENT_TEXTURE_LAYER:
+      case this.FRAMEBUFFER_ATTACHMENT_RED_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_GREEN_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_BLUE_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE:
+      case this.FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE:
+      case this.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING:
+        return true
+    }
+    return false
+  }
+
+  _attachmentObject (target, attachment) {
+    this._saveError()
+    const type = gl.getFramebufferAttachmentParameter.call(this, target, attachment, this.FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE)
+    this._restoreError(this.NO_ERROR)
+    let object = null
+    if (type === this.RENDERBUFFER || type === this.TEXTURE) {
+      object = this._getActiveFramebuffer(target)._attachments[attachment] || null
+    }
+    return { type, object }
+  }
+
   readPixels (x, y, width, height, format, type, pixels, dstOffset) {
     if (ArrayBuffer.isView(pixels)) {
       if (arguments.length > 7) {
@@ -545,6 +1020,22 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     pname |= 0
     if (pname === this.VERTEX_ARRAY_BINDING) {
       return this._activeVertexArrayObject
+    }
+    if (pname === this.READ_BUFFER) {
+      const framebuffer = this._activeFramebuffers.read
+      return framebuffer ? framebuffer._readBuffer : this._defaultReadBuffer
+    }
+    const drawBuffer = pname - this.DRAW_BUFFER0
+    if (drawBuffer >= 0 && drawBuffer < 16) {
+      if (drawBuffer >= this._maxDrawBuffers) {
+        this.setError(this.INVALID_ENUM)
+        return null
+      }
+      const framebuffer = this._activeFramebuffers.draw
+      if (framebuffer) {
+        return drawBuffer < framebuffer._drawBuffers.length ? framebuffer._drawBuffers[drawBuffer] : this.NONE
+      }
+      return drawBuffer === 0 ? this._defaultDrawBuffer : this.NONE
     }
     return super.getParameter(pname)
   }

@@ -88,6 +88,10 @@ function createContext (width, height, options) {
     ctx._indexedBufferBindings[ctx.TRANSFORM_FEEDBACK_BUFFER] =
       new Array(ctx.getParameter(ctx.MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS)).fill(null)
     ctx._uniformBufferOffsetAlignment = ctx.getParameter(ctx.UNIFORM_BUFFER_OFFSET_ALIGNMENT)
+    ctx._maxDrawBuffers = ctx.getParameter(ctx.MAX_DRAW_BUFFERS)
+    ctx._maxColorAttachments = ctx.getParameter(ctx.MAX_COLOR_ATTACHMENTS)
+    ctx._defaultReadBuffer = ctx.BACK
+    ctx._defaultDrawBuffer = ctx.BACK
   }
 
   // Initialize texture units
