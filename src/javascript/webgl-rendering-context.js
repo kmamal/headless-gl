@@ -13,6 +13,7 @@ const { getEXTTextureFilterAnisotropic } = require('./extensions/ext-texture-fil
 const { getEXTShaderTextureLod } = require('./extensions/ext-shader-texture-lod')
 const { getOESVertexArrayObject } = require('./extensions/oes-vertex-array-object')
 const {
+  toIntPtr,
   bindPublics,
   checkObject,
   checkUniform,
@@ -1004,7 +1005,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         active._elements = new Uint8Array(u8Data)
       }
     } else if (typeof data === 'number') {
-      const size = data | 0
+      const size = toIntPtr(data)
       if (size < 0) {
         this.setError(this.INVALID_VALUE)
         return
@@ -1032,7 +1033,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   bufferSubData (target, offset, data) {
     target |= 0
-    offset |= 0
+    offset = toIntPtr(offset)
 
     if (target !== this.ARRAY_BUFFER &&
       target !== this.ELEMENT_ARRAY_BUFFER) {
@@ -1516,7 +1517,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     mode |= 0
     count |= 0
     type |= 0
-    ioffset |= 0
+    ioffset = toIntPtr(ioffset)
 
     return super.drawElements(mode, count, type, ioffset)
   }
@@ -2606,7 +2607,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     type |= 0
     normalized = !!normalized
     stride |= 0
-    offset |= 0
+    offset = toIntPtr(offset)
 
     if (stride < 0 ||
       offset < 0 ||

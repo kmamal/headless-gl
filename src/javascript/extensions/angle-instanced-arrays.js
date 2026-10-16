@@ -1,4 +1,5 @@
 const { gl } = require('../native-gl')
+const { toIntPtr } = require('../utils')
 
 class ANGLEInstancedArrays {
   constructor (ctx) {
@@ -15,7 +16,7 @@ class ANGLEInstancedArrays {
   }
 
   drawElementsInstancedANGLE (mode, count, type, ioffset, primCount) {
-    this._drawElementsInstancedANGLE(mode, count, type, ioffset, primCount)
+    this._drawElementsInstancedANGLE(mode, count, type, toIntPtr(ioffset), primCount)
   }
 
   vertexAttribDivisorANGLE (index, divisor) {

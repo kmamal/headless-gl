@@ -713,11 +713,10 @@ GL_METHOD(DrawElementsInstancedANGLE) {
   GLenum mode = Nan::To<int32_t>(info[0]).ToChecked();
   GLint count = Nan::To<int32_t>(info[1]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[2]).ToChecked();
-  GLint offset = Nan::To<int32_t>(info[3]).ToChecked();
+  intptr_t offset = static_cast<intptr_t>(Nan::To<int64_t>(info[3]).ToChecked());
   GLuint icount = Nan::To<uint32_t>(info[4]).ToChecked();
 
-  glDrawElementsInstancedANGLE(mode, count, type,
-                               reinterpret_cast<GLvoid *>(static_cast<uintptr_t>(offset)), icount);
+  glDrawElementsInstancedANGLE(mode, count, type, reinterpret_cast<GLvoid *>(offset), icount);
   RENDERDOC_COUNTER();
 }
 
@@ -1227,7 +1226,7 @@ GL_METHOD(BufferData) {
     Nan::TypedArrayContents<char> array(info[1]);
     glBufferData(target, array.length(), static_cast<void *>(*array), usage);
   } else if (info[1]->IsNumber()) {
-    glBufferData(target, Nan::To<int32_t>(info[1]).ToChecked(), NULL, usage);
+    glBufferData(target, static_cast<GLsizeiptr>(Nan::To<int64_t>(info[1]).ToChecked()), NULL, usage);
   }
 }
 
@@ -1235,7 +1234,7 @@ GL_METHOD(BufferSubData) {
   GL_BOILERPLATE;
 
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
-  GLint offset = Nan::To<int32_t>(info[1]).ToChecked();
+  GLintptr offset = static_cast<GLintptr>(Nan::To<int64_t>(info[1]).ToChecked());
   Nan::TypedArrayContents<char> array(info[2]);
 
   glBufferSubData(target, offset, array.length(), *array);
@@ -1272,7 +1271,7 @@ GL_METHOD(VertexAttribPointer) {
   GLenum type = Nan::To<int32_t>(info[2]).ToChecked();
   GLboolean normalized = Nan::To<bool>(info[3]).ToChecked();
   GLint stride = Nan::To<int32_t>(info[4]).ToChecked();
-  size_t offset = Nan::To<uint32_t>(info[5]).ToChecked();
+  intptr_t offset = static_cast<intptr_t>(Nan::To<int64_t>(info[5]).ToChecked());
 
   glVertexAttribPointer(index, size, type, normalized, stride, reinterpret_cast<GLvoid *>(offset));
 }
@@ -1289,7 +1288,7 @@ GL_METHOD(DrawElements) {
   GLenum mode = Nan::To<int32_t>(info[0]).ToChecked();
   GLint count = Nan::To<int32_t>(info[1]).ToChecked();
   GLenum type = Nan::To<int32_t>(info[2]).ToChecked();
-  size_t offset = Nan::To<uint32_t>(info[3]).ToChecked();
+  intptr_t offset = static_cast<intptr_t>(Nan::To<int64_t>(info[3]).ToChecked());
 
   glDrawElements(mode, count, type, reinterpret_cast<GLvoid *>(offset));
   RENDERDOC_COUNTER();
@@ -1685,8 +1684,7 @@ GL_METHOD(GetVertexAttribOffset) {
   void *ret = NULL;
   glGetVertexAttribPointerv(index, pname, &ret);
 
-  GLuint offset = static_cast<GLuint>(reinterpret_cast<size_t>(ret));
-  info.GetReturnValue().Set(Nan::New<v8::Integer>(offset));
+  info.GetReturnValue().Set(Nan::New<v8::Number>(static_cast<double>(reinterpret_cast<uintptr_t>(ret))));
 }
 
 GL_METHOD(IsBuffer) {

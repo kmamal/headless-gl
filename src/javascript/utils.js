@@ -230,10 +230,16 @@ function validCubeTarget (target) {
     target === gl.TEXTURE_CUBE_MAP_NEGATIVE_Z
 }
 
+function toIntPtr (value) {
+  value = Math.trunc(+value)
+  return Number.isFinite(value) ? value : 0
+}
+
 module.exports = {
   bindPublics,
   checkObject,
   isTypedArray,
+  toIntPtr,
   isValidString,
   vertexCount,
   typeSize,
