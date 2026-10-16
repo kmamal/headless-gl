@@ -6,6 +6,14 @@ const { getOESStandardDerivatives } = require('./extensions/oes-standard-derivat
 const { getOESTextureFloat } = require('./extensions/oes-texture-float')
 const { getOESTextureFloatLinear } = require('./extensions/oes-texture-float-linear')
 const { getSTACKGLDestroyContext } = require('./extensions/stackgl-destroy-context')
+const {
+  getWebGLCompressedTextureS3TC,
+  getWebGLCompressedTextureS3TCSRGB,
+  getWebGLCompressedTextureETC,
+  getWebGLCompressedTextureASTC,
+  getEXTTextureCompressionBPTC,
+  getEXTTextureCompressionRGTC
+} = require('./extensions/compressed-textures')
 const { getSTACKGLResizeDrawingBuffer } = require('./extensions/stackgl-resize-drawing-buffer')
 const { getWebGLDrawBuffers } = require('./extensions/webgl-draw-buffers')
 const { getEXTBlendMinMax } = require('./extensions/ext-blend-minmax')
@@ -63,6 +71,12 @@ const availableExtensions = {
   oes_standard_derivatives: getOESStandardDerivatives,
   oes_vertex_array_object: getOESVertexArrayObject,
   stackgl_destroy_context: getSTACKGLDestroyContext,
+  webgl_compressed_texture_s3tc: getWebGLCompressedTextureS3TC,
+  webgl_compressed_texture_s3tc_srgb: getWebGLCompressedTextureS3TCSRGB,
+  webgl_compressed_texture_etc: getWebGLCompressedTextureETC,
+  webgl_compressed_texture_astc: getWebGLCompressedTextureASTC,
+  ext_texture_compression_bptc: getEXTTextureCompressionBPTC,
+  ext_texture_compression_rgtc: getEXTTextureCompressionRGTC,
   stackgl_resize_drawingbuffer: getSTACKGLResizeDrawingBuffer,
   webgl_draw_buffers: getWebGLDrawBuffers,
   ext_blend_minmax: getEXTBlendMinMax,
@@ -1982,7 +1996,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   getParameter (pname) {
     switch (pname) {
       case this.COMPRESSED_TEXTURE_FORMATS:
-        return new Uint32Array(0)
+        return new Uint32Array(this._compressedFormats ? Array.from(this._compressedFormats).sort((a, b) => a - b) : [])
       case this.ARRAY_BUFFER_BINDING:
         return this._vertexGlobalState._arrayBufferBinding
       case this.ELEMENT_ARRAY_BUFFER_BINDING:
@@ -3089,12 +3103,73 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
   }
 
-  compressedTexImage2D () {
-    // TODO not yet implemented
+  _compressedData (data, srcOffset, srcLengthOverride, name) {
+    if ((typeof data !== 'number' || !this._isWebGL2()) && !ArrayBuffer.isView(data)) {
+      throw new TypeError(name + '(..., ArrayBufferView, GLuint, GLuint)')
+    }
+    if (typeof data === 'number') {
+      if (!this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER)) {
+        this.setError(this.INVALID_OPERATION)
+        return null
+      }
+      const offset = toIntPtr(srcOffset)
+      if (data < 0 || offset < 0) {
+        this.setError(this.INVALID_VALUE)
+        return null
+      }
+      return { size: data | 0, payload: offset }
+    }
+    if (this._isWebGL2() && this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER)) {
+      this.setError(this.INVALID_OPERATION)
+      return null
+    }
+    const start = srcOffset | 0
+    const elementSize = data.BYTES_PER_ELEMENT || 1
+    const elementCount = data.byteLength / elementSize
+    const length = (srcLengthOverride | 0) || elementCount - start
+    if (start < 0 || length < 0 || start + length > elementCount) {
+      this.setError(this.INVALID_VALUE)
+      return null
+    }
+    const view = new Uint8Array(data.buffer, data.byteOffset + start * elementSize, length * elementSize)
+    return { size: view.byteLength, payload: view }
   }
 
-  compressedTexSubImage2D () {
-    // TODO not yet implemented
+  _compressedTexImage (target, level, internalFormat, width, height, border, data, srcOffset, srcLengthOverride) {
+    const source = this._compressedData(data, srcOffset, srcLengthOverride, 'compressedTexImage2D')
+    if (!source) { return }
+    if (this._getActiveTextureForImage(target) === null) {
+      if (target === this.TEXTURE_2D || validCubeTarget(target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+    }
+    this._saveError()
+    super.compressedTexImage2D(target, level, internalFormat, width, height, border, source.size, source.payload)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      const texture = this._getTexImage(target)
+      texture._format = internalFormat
+      texture._type = 0
+    }
+  }
+
+  compressedTexImage2D (target, level, internalFormat, width, height, border, data, srcOffset = 0, srcLengthOverride = 0) {
+    this._compressedTexImage(target | 0, level | 0, internalFormat | 0, width | 0, height | 0, border | 0, data, srcOffset, srcLengthOverride)
+  }
+
+  compressedTexSubImage2D (target, level, xoffset, yoffset, width, height, format, data, srcOffset = 0, srcLengthOverride = 0) {
+    target |= 0
+    const source = this._compressedData(data, srcOffset, srcLengthOverride, 'compressedTexSubImage2D')
+    if (!source) { return }
+    if (this._getActiveTextureForImage(target) === null) {
+      if (target === this.TEXTURE_2D || validCubeTarget(target)) {
+        this.setError(this.INVALID_OPERATION)
+        return
+      }
+    }
+    return super.compressedTexSubImage2D(target, level | 0, xoffset | 0, yoffset | 0, width | 0, height | 0, format | 0, source.size, source.payload)
   }
 
   _checkUniformValid (location, v0, name, count, type) {

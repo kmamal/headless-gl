@@ -179,6 +179,8 @@ NAN_MODULE_INIT(Init) {
   JS_GL_METHOD("texImage3D", TexImage3D);
   JS_GL_METHOD("texSubImage3D", TexSubImage3D);
   JS_GL_METHOD("copyTexSubImage3D", CopyTexSubImage3D);
+  JS_GL_METHOD("compressedTexImage2D", CompressedTexImage2D);
+  JS_GL_METHOD("compressedTexSubImage2D", CompressedTexSubImage2D);
   JS_GL_METHOD("compressedTexImage3D", CompressedTexImage3D);
   JS_GL_METHOD("compressedTexSubImage3D", CompressedTexSubImage3D);
   JS_GL_METHOD("getFragDataLocation", GetFragDataLocation);

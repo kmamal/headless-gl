@@ -1373,6 +1373,45 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
     return super.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, source)
   }
 
+  compressedTexImage3D (target, level, internalFormat, width, height, depth, border, data, srcOffset = 0, srcLengthOverride = 0) {
+    target |= 0
+    internalFormat |= 0
+    const source = this._compressedData(data, srcOffset, srcLengthOverride, 'compressedTexImage3D')
+    if (!source) return
+    if (target !== this.TEXTURE_3D && target !== this.TEXTURE_2D_ARRAY) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    const texture = this._getActiveTexture(target)
+    if (!texture) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    this._saveError()
+    super.compressedTexImage3D(target, level | 0, internalFormat, width | 0, height | 0, depth | 0, border | 0, source.size, source.payload)
+    const error = this.getError()
+    this._restoreError(error)
+    if (error === this.NO_ERROR) {
+      texture._format = internalFormat
+      texture._type = 0
+    }
+  }
+
+  compressedTexSubImage3D (target, level, xoffset, yoffset, zoffset, width, height, depth, format, data, srcOffset = 0, srcLengthOverride = 0) {
+    target |= 0
+    const source = this._compressedData(data, srcOffset, srcLengthOverride, 'compressedTexSubImage3D')
+    if (!source) return
+    if (target !== this.TEXTURE_3D && target !== this.TEXTURE_2D_ARRAY) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
+    if (!this._getActiveTexture(target)) {
+      this.setError(this.INVALID_OPERATION)
+      return
+    }
+    super.compressedTexSubImage3D(target, level | 0, xoffset | 0, yoffset | 0, zoffset | 0, width | 0, height | 0, depth | 0, format | 0, source.size, source.payload)
+  }
+
   copyTexSubImage3D (target, level, xoffset, yoffset, zoffset, x, y, width, height) {
     target |= 0
     if (target !== this.TEXTURE_3D && target !== this.TEXTURE_2D_ARRAY) {

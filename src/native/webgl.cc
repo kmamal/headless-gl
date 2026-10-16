@@ -362,6 +362,20 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   webGLToANGLEExtensions.insert(
       {"EXT_texture_filter_anisotropic", {"GL_EXT_texture_filter_anisotropic"}});
   webGLToANGLEExtensions.insert({"OES_texture_float_linear", {"GL_OES_texture_float_linear"}});
+  webGLToANGLEExtensions.insert({"WEBGL_compressed_texture_s3tc",
+                                 {"GL_EXT_texture_compression_dxt1",
+                                  "GL_ANGLE_texture_compression_dxt3",
+                                  "GL_ANGLE_texture_compression_dxt5"}});
+  webGLToANGLEExtensions.insert(
+      {"WEBGL_compressed_texture_s3tc_srgb", {"GL_EXT_texture_compression_s3tc_srgb"}});
+  webGLToANGLEExtensions.insert(
+      {"WEBGL_compressed_texture_etc", {"GL_ANGLE_compressed_texture_etc"}});
+  webGLToANGLEExtensions.insert(
+      {"WEBGL_compressed_texture_astc", {"GL_KHR_texture_compression_astc_ldr"}});
+  webGLToANGLEExtensions.insert(
+      {"EXT_texture_compression_bptc", {"GL_EXT_texture_compression_bptc"}});
+  webGLToANGLEExtensions.insert(
+      {"EXT_texture_compression_rgtc", {"GL_EXT_texture_compression_rgtc"}});
   if (createWebGL2Context) {
     webGLToANGLEExtensions.insert({"EXT_color_buffer_float", {"GL_EXT_color_buffer_float"}});
     webGLToANGLEExtensions.insert(
@@ -2789,6 +2803,59 @@ GL_METHOD(CopyTexSubImage3D) {
   glCopyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
 }
 
+GL_METHOD(CompressedTexImage2D) {
+  GL_BOILERPLATE;
+  GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
+  GLint level = Nan::To<int32_t>(info[1]).ToChecked();
+  GLenum internalformat = Nan::To<int32_t>(info[2]).ToChecked();
+  GLsizei width = Nan::To<int32_t>(info[3]).ToChecked();
+  GLsizei height = Nan::To<int32_t>(info[4]).ToChecked();
+  GLint border = Nan::To<int32_t>(info[5]).ToChecked();
+  GLsizei imageSize = Nan::To<int32_t>(info[6]).ToChecked();
+  if (info[7]->IsUndefined()) {
+    glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize,
+                           nullptr);
+  } else if (info[7]->IsArrayBufferView()) {
+    Nan::TypedArrayContents<unsigned char> data(info[7]);
+    void *bufferPtr = *data;
+    glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize,
+                           bufferPtr);
+  } else if (info[7]->IsNumber()) {
+    void *bufferPtr = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[7]).ToChecked()));
+    glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize,
+                           bufferPtr);
+  } else {
+    Nan::ThrowTypeError("Invalid data type for CompressedTexImage2D");
+  }
+}
+
+GL_METHOD(CompressedTexSubImage2D) {
+  GL_BOILERPLATE;
+  GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
+  GLint level = Nan::To<int32_t>(info[1]).ToChecked();
+  GLint xoffset = Nan::To<int32_t>(info[2]).ToChecked();
+  GLint yoffset = Nan::To<int32_t>(info[3]).ToChecked();
+  GLsizei width = Nan::To<int32_t>(info[4]).ToChecked();
+  GLsizei height = Nan::To<int32_t>(info[5]).ToChecked();
+  GLenum format = Nan::To<int32_t>(info[6]).ToChecked();
+  GLsizei imageSize = Nan::To<int32_t>(info[7]).ToChecked();
+  if (info[8]->IsUndefined()) {
+    glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize,
+                              nullptr);
+  } else if (info[8]->IsArrayBufferView()) {
+    Nan::TypedArrayContents<unsigned char> data(info[8]);
+    void *bufferPtr = *data;
+    glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize,
+                              bufferPtr);
+  } else if (info[8]->IsNumber()) {
+    void *bufferPtr = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[8]).ToChecked()));
+    glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize,
+                              bufferPtr);
+  } else {
+    Nan::ThrowTypeError("Invalid data type for CompressedTexSubImage2D");
+  }
+}
+
 GL_METHOD(CompressedTexImage3D) {
   GL_BOILERPLATE;
   GLenum target = Nan::To<int32_t>(info[0]).ToChecked();
@@ -2803,8 +2870,12 @@ GL_METHOD(CompressedTexImage3D) {
     glCompressedTexImage3D(target, level, internalformat, width, height, depth, border, imageSize,
                            nullptr);
   } else if (info[8]->IsArrayBufferView()) {
-    auto buffer = info[8].As<v8::ArrayBufferView>();
-    void *bufferPtr = buffer->Buffer()->GetBackingStore()->Data();
+    Nan::TypedArrayContents<unsigned char> data(info[8]);
+    void *bufferPtr = *data;
+    glCompressedTexImage3D(target, level, internalformat, width, height, depth, border, imageSize,
+                           bufferPtr);
+  } else if (info[8]->IsNumber()) {
+    void *bufferPtr = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[8]).ToChecked()));
     glCompressedTexImage3D(target, level, internalformat, width, height, depth, border, imageSize,
                            bufferPtr);
   } else {
@@ -2828,8 +2899,12 @@ GL_METHOD(CompressedTexSubImage3D) {
     glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth,
                               format, imageSize, nullptr);
   } else if (info[10]->IsArrayBufferView()) {
-    auto buffer = info[10].As<v8::ArrayBufferView>();
-    void *bufferPtr = buffer->Buffer()->GetBackingStore()->Data();
+    Nan::TypedArrayContents<unsigned char> data(info[10]);
+    void *bufferPtr = *data;
+    glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth,
+                              format, imageSize, bufferPtr);
+  } else if (info[10]->IsNumber()) {
+    void *bufferPtr = reinterpret_cast<void *>(static_cast<intptr_t>(Nan::To<int64_t>(info[10]).ToChecked()));
     glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth,
                               format, imageSize, bufferPtr);
   } else {

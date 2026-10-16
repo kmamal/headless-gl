@@ -297,6 +297,8 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(TexImage3D);
   static NAN_METHOD(TexSubImage3D);
   static NAN_METHOD(CopyTexSubImage3D);
+  static NAN_METHOD(CompressedTexImage2D);
+  static NAN_METHOD(CompressedTexSubImage2D);
   static NAN_METHOD(CompressedTexImage3D);
   static NAN_METHOD(CompressedTexSubImage3D);
   static NAN_METHOD(GetFragDataLocation);
