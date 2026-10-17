@@ -34,7 +34,7 @@
     "modern-tar": "0.8.4"
   },
   "devDependencies": {
-    "@stackgl/gl-conformance": "2.1.3",
+    "@kmamal/gl-conformance": "2.1.4",
     "nan": "2.27.0",
     "node-gyp": "12.3.0",
     "tape": "5.10.3"
