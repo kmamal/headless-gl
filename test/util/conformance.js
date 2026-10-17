@@ -1,5 +1,5 @@
 const tape = require('tape')
-const runConformance = require('@stackgl/gl-conformance')
+const runConformance = require('@kmamal/gl-conformance')
 const createContext = require('../../index')
 
 // Inject WebGL types into global namespaces, required by some conformance tests
