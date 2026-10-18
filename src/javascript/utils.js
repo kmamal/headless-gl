@@ -424,6 +424,7 @@ module.exports = {
   checkObject,
   isTypedArray,
   isArrayBuffer,
+  isInstanceOfType,
   toIntPtr,
   isValidString,
   vertexCount,

@@ -33,6 +33,7 @@ const {
   packImageSource,
   isTypedArray,
   isArrayBuffer,
+  isInstanceOfType,
   unpackTypedArray,
   convertPixels,
   validCubeTarget
@@ -3137,13 +3138,14 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       this.setError(this.INVALID_OPERATION)
       return false
     }
+    const isBitmap = isInstanceOfType(image, 'ImageBitmap')
     const pixels = packImageSource(
       image,
       { x, y, width, height, depth, imageHeight },
       format,
       type,
-      super.getParameter(this.UNPACK_FLIP_Y_WEBGL),
-      super.getParameter(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL))
+      !isBitmap && super.getParameter(this.UNPACK_FLIP_Y_WEBGL),
+      !isBitmap && super.getParameter(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL))
     if (!pixels) {
       this.setError(this.INVALID_OPERATION)
       return false
