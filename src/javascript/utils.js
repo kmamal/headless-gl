@@ -65,7 +65,13 @@ function isTypedArray (data) {
     isInstanceOfType(data, 'Uint32Array') ||
     isInstanceOfType(data, 'Int32Array') ||
     isInstanceOfType(data, 'Float32Array') ||
-    isInstanceOfType(data, 'Float64Array')
+    isInstanceOfType(data, 'Float64Array') ||
+    isInstanceOfType(data, 'Float16Array')
+}
+
+function isArrayBuffer (data) {
+  return isInstanceOfType(data, 'ArrayBuffer') ||
+    isInstanceOfType(data, 'SharedArrayBuffer')
 }
 
 // Don't allow: ", $, `, @, \, ', \0
@@ -417,6 +423,7 @@ module.exports = {
   bindPublics,
   checkObject,
   isTypedArray,
+  isArrayBuffer,
   toIntPtr,
   isValidString,
   vertexCount,

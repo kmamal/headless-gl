@@ -32,6 +32,7 @@ const {
   extractImageData,
   packImageSource,
   isTypedArray,
+  isArrayBuffer,
   unpackTypedArray,
   convertPixels,
   validCubeTarget
@@ -1276,9 +1277,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
     if (typeof data === 'object') {
       let u8Data = null
-      if (isTypedArray(data) || data instanceof DataView) {
+      if (ArrayBuffer.isView(data) || isTypedArray(data)) {
         u8Data = unpackTypedArray(data)
-      } else if (data instanceof ArrayBuffer) {
+      } else if (isArrayBuffer(data)) {
         u8Data = new Uint8Array(data)
       } else {
         this.setError(this.INVALID_VALUE)
@@ -1357,9 +1358,9 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
 
     let u8Data = null
-    if (isTypedArray(data) || data instanceof DataView) {
+    if (ArrayBuffer.isView(data) || isTypedArray(data)) {
       u8Data = unpackTypedArray(data)
-    } else if (data instanceof ArrayBuffer) {
+    } else if (isArrayBuffer(data)) {
       u8Data = new Uint8Array(data)
     } else {
       this.setError(this.INVALID_VALUE)
