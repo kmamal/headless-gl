@@ -275,7 +275,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
       swapError(EGL_SUCCESS), context(EGL_NO_CONTEXT), surface(EGL_NO_SURFACE),
       holdsDisplayRef(false), unpack_flip_y(false), unpack_premultiply_alpha(false),
       unpack_colorspace_conversion(0x9244), unpack_alignment(4), isWebGL2(createWebGL2Context),
-      threadConflict(false),
+      antialias(antialias), framebufferBlitNV(false), threadConflict(false),
       webGLToANGLEExtensions(&CaseInsensitiveCompare), next(NULL), prev(NULL) {
 
   // Uncomment on Windows to attach debugger
@@ -408,9 +408,9 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                           EGL_ALPHA_SIZE,
                           hasWindow && !alpha ? 0 : 8,
                           EGL_DEPTH_SIZE,
-                          hasWindow && !depth ? 0 : 24,
+                          hasWindow && (!depth || antialias) ? 0 : 24,
                           EGL_STENCIL_SIZE,
-                          hasWindow && !stencil ? 0 : 8,
+                          hasWindow && (!stencil || antialias) ? 0 : 8,
                           EGL_RENDERABLE_TYPE,
                           renderableTypeBit,
                           EGL_NONE};
@@ -557,6 +557,21 @@ void WebGLRenderingContext::loadExtensions() {
 
   // Request necessary WebGL extensions.
   glRequestExtensionANGLE("GL_EXT_texture_storage");
+
+  if (!isWebGL2) {
+    std::vector<const char *> extensions = {"GL_ANGLE_framebuffer_blit", "GL_NV_framebuffer_blit"};
+    if (antialias) {
+      extensions.push_back("GL_ANGLE_framebuffer_multisample");
+      extensions.push_back("GL_OES_rgb8_rgba8");
+    }
+    for (const char *extension : extensions) {
+      if (enabledExtensions.count(extension) == 0 && requestableExtensions.count(extension) != 0) {
+        glRequestExtensionANGLE(extension);
+      }
+    }
+    enabledExtensions = GetStringSetFromCString((const char *)glGetString(GL_EXTENSIONS));
+  }
+  framebufferBlitNV = !isWebGL2 && enabledExtensions.count("GL_NV_framebuffer_blit") != 0;
 }
 
 bool WebGLRenderingContext::restoreContext() {
@@ -2911,7 +2926,13 @@ GL_METHOD(BlitFramebuffer) {
   GLint dstY1 = Nan::To<int32_t>(info[7]).ToChecked();
   GLbitfield mask = Nan::To<uint32_t>(info[8]).ToChecked();
   GLenum filter = Nan::To<int32_t>(info[9]).ToChecked();
-  glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+  if (inst->isWebGL2) {
+    glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+  } else if (inst->framebufferBlitNV) {
+    glBlitFramebufferNV(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+  } else {
+    glBlitFramebufferANGLE(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+  }
 }
 
 GL_METHOD(FramebufferTextureLayer) {
@@ -2989,7 +3010,11 @@ GL_METHOD(RenderbufferStorageMultisample) {
   GLenum internalformat = Nan::To<int32_t>(info[2]).ToChecked();
   GLsizei width = Nan::To<int32_t>(info[3]).ToChecked();
   GLsizei height = Nan::To<int32_t>(info[4]).ToChecked();
-  glRenderbufferStorageMultisample(target, samples, internalformat, width, height);
+  if (inst->isWebGL2) {
+    glRenderbufferStorageMultisample(target, samples, internalformat, width, height);
+  } else {
+    glRenderbufferStorageMultisampleANGLE(target, samples, internalformat, width, height);
+  }
 }
 
 GL_METHOD(TexStorage2D) {

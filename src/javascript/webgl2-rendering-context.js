@@ -589,7 +589,7 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
   }
 
   _defaultFramebufferAttachment (attachment) {
-    if (this._hasWindow) {
+    if (!this._drawingBuffer._framebuffer) {
       return attachment
     }
     switch (attachment) {
@@ -786,10 +786,22 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       this.setError(this.INVALID_OPERATION)
       return
     }
+    srcX0 |= 0
+    srcY0 |= 0
+    srcX1 |= 0
+    srcY1 |= 0
+    let resolved = false
+    if (mask === this.COLOR_BUFFER_BIT) {
+      const margin = filter === this.LINEAR ? 1 : 0
+      const x = Math.min(srcX0, srcX1) - margin
+      const y = Math.min(srcY0, srcY1) - margin
+      resolved = this._beginDefaultFramebufferRead(x, y, Math.max(srcX0, srcX1) + margin - x, Math.max(srcY0, srcY1) + margin - y)
+    }
     super.blitFramebuffer(
-      srcX0 | 0, srcY0 | 0, srcX1 | 0, srcY1 | 0,
+      srcX0, srcY0, srcX1, srcY1,
       dstX0 | 0, dstY0 | 0, dstX1 | 0, dstY1 | 0,
       mask, filter)
+    if (resolved) { this._endDefaultFramebufferRead() }
   }
 
   renderbufferStorageMultisample (target, samples, internalFormat, width, height) {
@@ -1425,8 +1437,14 @@ class WebGL2RenderingContext extends WebGLRenderingContextHelper {
       this.setError(this.INVALID_OPERATION)
       return
     }
-    return super.copyTexSubImage3D(target, level | 0, xoffset | 0, yoffset | 0, zoffset | 0,
-      x | 0, y | 0, width | 0, height | 0)
+    x |= 0
+    y |= 0
+    width |= 0
+    height |= 0
+    const resolved = this._beginDefaultFramebufferRead(x, y, width, height)
+    super.copyTexSubImage3D(target, level | 0, xoffset | 0, yoffset | 0, zoffset | 0,
+      x, y, width, height)
+    if (resolved) { this._endDefaultFramebufferRead() }
   }
 
   _isTexParameter (pname) {

@@ -92,6 +92,8 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   GLint unpack_colorspace_conversion;
   GLint unpack_alignment;
   bool isWebGL2;
+  bool antialias;
+  bool framebufferBlitNV;
   bool threadConflict;
 
   std::set<std::string> requestableExtensions;

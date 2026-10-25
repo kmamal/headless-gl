@@ -39,6 +39,16 @@ Contexts created this way have these differences from headless contexts:
 * `drawingBufferWidth` and `drawingBufferHeight` do not follow the window. When the window is resized, call `gl.getExtension('STACKGL_resize_drawingbuffer').resize(pixelWidth, pixelHeight)` to update them.
 * Destroy the context with `gl.getExtension('STACKGL_destroy_context').destroy()` before destroying the window.
 * EGL allows one surface per window, so destroy a window's context before creating another one on the same window.
+* With `antialias: false` the context draws straight into the window surface, unless `alpha` is `false` and the window surface has an alpha channel, in which case it draws into an internal framebuffer without one and `gl.swap()` copies it into the window surface. With `antialias: true` (the default) it draws into an internal multisampled framebuffer, the same way headless contexts emulate the default framebuffer, and `gl.swap()` resolves it into the window surface before presenting. Unless `preserveDrawingBuffer` is set, the drawing buffer is cleared after each swap, like in a browser.
+
+
+## Antialiasing
+
+`antialias` defaults to `true`, as in browsers, for both headless and window contexts. The default framebuffer is then backed by multisampled renderbuffers with `min(4, MAX_SAMPLES)` samples, and `getParameter(SAMPLES)` and `getParameter(SAMPLE_BUFFERS)` report it while it is bound.
+Reading from it with `readPixels`, `copyTexImage2D`, `copyTexSubImage2D`, `copyTexSubImage3D` or a color-only `blitFramebuffer` resolves it implicitly first, like a browser does.
+Blitting depth or stencil out of it follows the multisample rules (identical rectangles), and blitting into it fails with `INVALID_OPERATION`, as in browsers.
+If multisampling is unavailable, `getContextAttributes().antialias` reports `false`.
+Pass `antialias: false` to get the previous behavior back.
 
 
 ## Worker threads

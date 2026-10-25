@@ -3,8 +3,8 @@
 const tape = require('tape')
 const createContext = require('../index')
 
-function createGL (t) {
-  const gl = createContext(8, 8, { createWebGL2Context: true })
+function createGL (t, options) {
+  const gl = createContext(8, 8, { createWebGL2Context: true, ...options })
   t.ok(gl, 'created a WebGL2 context')
   return gl
 }
@@ -182,7 +182,7 @@ tape('readBuffer and drawBuffers', function (t) {
 })
 
 tape('blitFramebuffer and multisampled renderbuffers', function (t) {
-  const gl = createGL(t)
+  const gl = createGL(t, { antialias: false })
   const maxSamples = gl.getParameter(gl.MAX_SAMPLES)
   t.ok(maxSamples >= 4, 'MAX_SAMPLES is at least 4')
   const samples = Math.min(4, maxSamples)

@@ -50,7 +50,7 @@ class WebGLDrawBuffers {
     }
     if (buffers.length === 1 && buffers[0] === gl.BACK) {
       this._buffersState = buffers
-      ctx.drawBuffersWEBGL(ctx._hasWindow && !ctx._activeFramebuffers.draw ? buffers : [this.COLOR_ATTACHMENT0_WEBGL])
+      ctx.drawBuffersWEBGL(!ctx._drawingBuffer._framebuffer && !ctx._activeFramebuffers.draw ? buffers : [this.COLOR_ATTACHMENT0_WEBGL])
       return
     } else if (!ctx._activeFramebuffers.draw) {
       if (buffers.length > 1) {

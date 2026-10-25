@@ -23,7 +23,7 @@ function createContext (width, height, options) {
     flag(options, 'alpha', true),
     flag(options, 'depth', true),
     flag(options, 'stencil', false),
-    false, // flag(options, 'antialias', true),
+    flag(options, 'antialias', true),
     flag(options, 'premultipliedAlpha', true),
     flag(options, 'preserveDrawingBuffer', false),
     flag(options, 'preferLowPowerToHighPerformance', false),
@@ -79,6 +79,7 @@ function createContext (width, height, options) {
   ctx._ = CONTEXT_COUNTER++
 
   ctx._contextAttributes = contextAttributes
+  ctx._windowSurfaceIsBare = hasWindow && contextAttributes.antialias
 
   initContext(ctx, width, height, hasWindow)
 

@@ -66,6 +66,19 @@ const DEFAULT_ATTACHMENTS = [
 
 const DEFAULT_COLOR_ATTACHMENTS = [gl.COLOR_ATTACHMENT0]
 
+const READ_FRAMEBUFFER = 0x8CA8
+const DRAW_FRAMEBUFFER = 0x8CA9
+const READ_FRAMEBUFFER_BINDING = 0x8CAA
+const READ_BUFFER = 0x0C02
+const DRAW_BUFFER0 = 0x8825
+const MAX_SAMPLES = 0x8D57
+const RASTERIZER_DISCARD = 0x8C89
+const RGB8 = 0x8051
+const RGBA8 = 0x8058
+const DEPTH_COMPONENT24 = 0x81A6
+const DEPTH24_STENCIL8 = 0x88F0
+const MAX_DRAWING_BUFFER_SAMPLES = 4
+
 const availableExtensions = {
   angle_instanced_arrays: getANGLEInstancedArrays,
   oes_element_index_uint: getOESElementIndexUint,
@@ -537,7 +550,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   _resizeDrawingBuffer (width, height) {
-    if (this._hasWindow) { return }
+    const drawingBuffer = this._drawingBuffer
+    if (!drawingBuffer._framebuffer) { return }
+    drawingBuffer._width = width
+    drawingBuffer._height = height
     const unpackBuffer = this._isWebGL2() ? this._getActiveBuffer(this.PIXEL_UNPACK_BUFFER) : null
     if (unpackBuffer) {
       super.bindBuffer(this.PIXEL_UNPACK_BUFFER, 0)
@@ -547,6 +563,26 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     const prevTexture = this._getActiveTexture(this.TEXTURE_2D)
     const prevRenderbuffer = this._activeRenderbuffer
 
+    if (drawingBuffer._samples) {
+      this._resizeMultisampledDrawingBuffer(width, height)
+    } else {
+      this._resizeSingleSampledDrawingBuffer(width, height)
+    }
+
+    if (prevReadFramebuffer === prevDrawFramebuffer) {
+      this.bindFramebuffer(this.FRAMEBUFFER, prevDrawFramebuffer)
+    } else {
+      this.bindFramebuffer(this.DRAW_FRAMEBUFFER, prevDrawFramebuffer)
+      this.bindFramebuffer(this.READ_FRAMEBUFFER, prevReadFramebuffer)
+    }
+    this.bindTexture(this.TEXTURE_2D, prevTexture)
+    this.bindRenderbuffer(this.RENDERBUFFER, prevRenderbuffer)
+    if (unpackBuffer) {
+      super.bindBuffer(this.PIXEL_UNPACK_BUFFER, unpackBuffer._ | 0)
+    }
+  }
+
+  _resizeSingleSampledDrawingBuffer (width, height) {
     const contextAttributes = this._contextAttributes
 
     const drawingBuffer = this._drawingBuffer
@@ -613,19 +649,211 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         this.RENDERBUFFER,
         drawingBuffer._depthStencil)
     }
+  }
 
-    // Restore previous binding state
-    if (prevReadFramebuffer === prevDrawFramebuffer) {
-      this.bindFramebuffer(this.FRAMEBUFFER, prevDrawFramebuffer)
+  _resizeMultisampledDrawingBuffer (width, height) {
+    const contextAttributes = this._contextAttributes
+    const drawingBuffer = this._drawingBuffer
+    const samples = drawingBuffer._samples
+
+    super.bindFramebuffer(this.FRAMEBUFFER, drawingBuffer._framebuffer)
+    super.bindRenderbuffer(this.RENDERBUFFER, drawingBuffer._color)
+    super.renderbufferStorageMultisample(
+      this.RENDERBUFFER,
+      samples,
+      contextAttributes.alpha ? RGBA8 : RGB8,
+      width,
+      height)
+    super.framebufferRenderbuffer(
+      this.FRAMEBUFFER,
+      this.COLOR_ATTACHMENT0,
+      this.RENDERBUFFER,
+      drawingBuffer._color)
+
+    let storage = 0
+    let attachment = 0
+    if (contextAttributes.depth && contextAttributes.stencil) {
+      storage = DEPTH24_STENCIL8
+      attachment = this.DEPTH_STENCIL_ATTACHMENT
+    } else if (contextAttributes.depth) {
+      storage = DEPTH_COMPONENT24
+      attachment = this.DEPTH_ATTACHMENT
+    } else if (contextAttributes.stencil) {
+      storage = this.STENCIL_INDEX8
+      attachment = this.STENCIL_ATTACHMENT
+    }
+    if (storage) {
+      super.bindRenderbuffer(this.RENDERBUFFER, drawingBuffer._depthStencil)
+      super.renderbufferStorageMultisample(this.RENDERBUFFER, samples, storage, width, height)
+      super.framebufferRenderbuffer(
+        this.FRAMEBUFFER,
+        attachment,
+        this.RENDERBUFFER,
+        drawingBuffer._depthStencil)
+    }
+
+    super.bindFramebuffer(this.FRAMEBUFFER, drawingBuffer._resolveFramebuffer)
+    super.bindTexture(this.TEXTURE_2D, drawingBuffer._resolveColor)
+    const colorFormat = contextAttributes.alpha ? this.RGBA : this.RGB
+    super.texImage2D(
+      this.TEXTURE_2D,
+      0,
+      colorFormat,
+      width,
+      height,
+      0,
+      colorFormat,
+      this.UNSIGNED_BYTE,
+      null)
+    super.texParameteri(this.TEXTURE_2D, this.TEXTURE_MIN_FILTER, this.NEAREST)
+    super.texParameteri(this.TEXTURE_2D, this.TEXTURE_MAG_FILTER, this.NEAREST)
+    super.framebufferTexture2D(
+      this.FRAMEBUFFER,
+      this.COLOR_ATTACHMENT0,
+      this.TEXTURE_2D,
+      drawingBuffer._resolveColor,
+      0)
+  }
+
+  _takeErrors () {
+    const errors = []
+    for (let i = 0; i < 16; ++i) {
+      const error = super.getError()
+      if (error === this.NO_ERROR) { break }
+      errors.push(error)
+    }
+    return errors
+  }
+
+  _putErrors (errors) {
+    this._takeErrors()
+    for (const error of errors) {
+      this.setError(error)
+    }
+  }
+
+  _nativeFramebuffer (framebuffer) {
+    return framebuffer ? framebuffer._ | 0 : this._drawingBuffer._framebuffer
+  }
+
+  _blitDrawingBuffer (readFramebuffer, drawFramebuffer, x0, y0, x1, y1) {
+    const scissorTest = super.isEnabled(this.SCISSOR_TEST)
+    const rasterizerDiscard = this._isWebGL2() && super.isEnabled(RASTERIZER_DISCARD)
+    if (scissorTest) { super.disable(this.SCISSOR_TEST) }
+    if (rasterizerDiscard) { super.disable(RASTERIZER_DISCARD) }
+    super.bindFramebuffer(READ_FRAMEBUFFER, readFramebuffer)
+    super.bindFramebuffer(DRAW_FRAMEBUFFER, drawFramebuffer)
+    super.blitFramebuffer(x0, y0, x1, y1, x0, y0, x1, y1, this.COLOR_BUFFER_BIT, this.NEAREST)
+    if (scissorTest) { super.enable(this.SCISSOR_TEST) }
+    if (rasterizerDiscard) { super.enable(RASTERIZER_DISCARD) }
+  }
+
+  _beginDefaultFramebufferRead (x, y, width, height) {
+    const drawingBuffer = this._drawingBuffer
+    if (!drawingBuffer._samples || this._activeFramebuffers.read) { return false }
+    if (this._isWebGL2() && this._defaultReadBuffer === this.NONE) { return false }
+    const x0 = Math.max(0, x)
+    const y0 = Math.max(0, y)
+    const x1 = Math.min(drawingBuffer._width, x + Math.max(0, width))
+    const y1 = Math.min(drawingBuffer._height, y + Math.max(0, height))
+    const errors = this._takeErrors()
+    if (!this._isWebGL2()) {
+      this._blitDrawingBuffer(drawingBuffer._framebuffer, drawingBuffer._resolveFramebuffer, 0, 0, drawingBuffer._width, drawingBuffer._height)
+    } else if (x1 > x0 && y1 > y0) {
+      this._blitDrawingBuffer(drawingBuffer._framebuffer, drawingBuffer._resolveFramebuffer, x0, y0, x1, y1)
+    }
+    super.bindFramebuffer(READ_FRAMEBUFFER, drawingBuffer._resolveFramebuffer)
+    super.bindFramebuffer(DRAW_FRAMEBUFFER, this._nativeFramebuffer(this._activeFramebuffers.draw))
+    this._putErrors(errors)
+    return true
+  }
+
+  _endDefaultFramebufferRead () {
+    super.bindFramebuffer(READ_FRAMEBUFFER, this._drawingBuffer._framebuffer)
+  }
+
+  _presentDrawingBuffer () {
+    const drawingBuffer = this._drawingBuffer
+    const width = drawingBuffer._width
+    const height = drawingBuffer._height
+    const errors = this._takeErrors()
+    let readBuffer = this.COLOR_ATTACHMENT0
+    if (this._isWebGL2()) {
+      super.bindFramebuffer(READ_FRAMEBUFFER, drawingBuffer._framebuffer)
+      readBuffer = super.getParameter(READ_BUFFER)
+      if (readBuffer !== this.COLOR_ATTACHMENT0) {
+        super.readBuffer(this.COLOR_ATTACHMENT0)
+      }
+    }
+    let presented = false
+    if (drawingBuffer._presentDirect) {
+      this._blitDrawingBuffer(drawingBuffer._framebuffer, 0, 0, 0, width, height)
+      presented = super.getError() === this.NO_ERROR
+      if (!presented && drawingBuffer._resolveFramebuffer) {
+        drawingBuffer._presentDirect = false
+      }
+    }
+    if (!drawingBuffer._presentDirect) {
+      this._blitDrawingBuffer(drawingBuffer._framebuffer, drawingBuffer._resolveFramebuffer, 0, 0, width, height)
+      this._blitDrawingBuffer(drawingBuffer._resolveFramebuffer, 0, 0, 0, width, height)
+      presented = super.getError() === this.NO_ERROR
+    }
+    if (readBuffer !== this.COLOR_ATTACHMENT0) {
+      super.bindFramebuffer(READ_FRAMEBUFFER, drawingBuffer._framebuffer)
+      super.readBuffer(readBuffer)
+    }
+    super.bindFramebuffer(READ_FRAMEBUFFER, this._nativeFramebuffer(this._activeFramebuffers.read))
+    super.bindFramebuffer(DRAW_FRAMEBUFFER, this._nativeFramebuffer(this._activeFramebuffers.draw))
+    this._putErrors(errors)
+    return presented
+  }
+
+  _setDrawingBufferDrawBuffer (buffer) {
+    if (this._isWebGL2()) {
+      super.drawBuffers([buffer])
     } else {
-      this.bindFramebuffer(this.DRAW_FRAMEBUFFER, prevDrawFramebuffer)
-      this.bindFramebuffer(this.READ_FRAMEBUFFER, prevReadFramebuffer)
+      super.drawBuffersWEBGL([buffer])
     }
-    this.bindTexture(this.TEXTURE_2D, prevTexture)
-    this.bindRenderbuffer(this.RENDERBUFFER, prevRenderbuffer)
-    if (unpackBuffer) {
-      super.bindBuffer(this.PIXEL_UNPACK_BUFFER, unpackBuffer._ | 0)
+  }
+
+  _clearDrawingBuffer () {
+    const errors = this._takeErrors()
+    const clearColor = super.getParameter(this.COLOR_CLEAR_VALUE)
+    const clearDepth = super.getParameter(this.DEPTH_CLEAR_VALUE)
+    const clearStencil = super.getParameter(this.STENCIL_CLEAR_VALUE)
+    const colorMask = super.getParameter(this.COLOR_WRITEMASK)
+    const depthMask = super.getParameter(this.DEPTH_WRITEMASK)
+    const stencilMask = super.getParameter(this.STENCIL_WRITEMASK)
+    const scissorTest = super.isEnabled(this.SCISSOR_TEST)
+    const rasterizerDiscard = this._isWebGL2() && super.isEnabled(RASTERIZER_DISCARD)
+    if (scissorTest) { super.disable(this.SCISSOR_TEST) }
+    if (rasterizerDiscard) { super.disable(RASTERIZER_DISCARD) }
+    super.clearColor(0, 0, 0, 0)
+    super.clearDepth(1)
+    super.clearStencil(0)
+    super.colorMask(true, true, true, true)
+    super.depthMask(true)
+    super.stencilMaskSeparate(this.FRONT, 0xFFFFFFFF)
+    super.bindFramebuffer(DRAW_FRAMEBUFFER, this._drawingBuffer._framebuffer)
+    let drawBuffer = this.COLOR_ATTACHMENT0
+    if (this._isWebGL2() || this._extensions.webgl_draw_buffers) {
+      drawBuffer = super.getParameter(DRAW_BUFFER0)
+      if (drawBuffer !== this.COLOR_ATTACHMENT0) {
+        this._setDrawingBufferDrawBuffer(this.COLOR_ATTACHMENT0)
+      }
     }
+    super.clear(this.COLOR_BUFFER_BIT | this.DEPTH_BUFFER_BIT | this.STENCIL_BUFFER_BIT)
+    if (drawBuffer !== this.COLOR_ATTACHMENT0) { this._setDrawingBufferDrawBuffer(drawBuffer) }
+    super.bindFramebuffer(DRAW_FRAMEBUFFER, this._nativeFramebuffer(this._activeFramebuffers.draw))
+    super.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3])
+    super.clearDepth(clearDepth)
+    super.clearStencil(clearStencil)
+    super.colorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3])
+    super.depthMask(depthMask)
+    super.stencilMaskSeparate(this.FRONT, stencilMask)
+    if (scissorTest) { super.enable(this.SCISSOR_TEST) }
+    if (rasterizerDiscard) { super.enable(RASTERIZER_DISCARD) }
+    this._putErrors(errors)
   }
 
   _restoreError (lastError) {
@@ -1459,6 +1687,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       }
     }
 
+    const resolved = this._beginDefaultFramebufferRead(x, y, width, height)
     this._saveError()
     super.copyTexImage2D(
       target,
@@ -1471,6 +1700,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       border)
     const error = this.getError()
     this._restoreError(error)
+    if (resolved) { this._endDefaultFramebufferRead() }
 
     if (error === this.NO_ERROR) {
       const texture = this._getTexImage(target)
@@ -1500,6 +1730,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       }
     }
 
+    const resolved = this._beginDefaultFramebufferRead(x, y, width, height)
     super.copyTexSubImage2D(
       target,
       level,
@@ -1509,6 +1740,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       y,
       width,
       height)
+    if (resolved) { this._endDefaultFramebufferRead() }
   }
 
   cullFace (mode) {
@@ -2103,6 +2335,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
         return 'WebGL GLSL ES 1.0 stack-gl'
 
       default:
+        if (!this._isWebGL2() && (pname === MAX_SAMPLES || pname === READ_FRAMEBUFFER_BINDING)) {
+          this.setError(this.INVALID_ENUM)
+          return null
+        }
         if (this._extensions) {
           if (this._extensions.oes_vertex_array_object && pname === this._extensions.oes_vertex_array_object.VERTEX_ARRAY_BINDING_OES) {
             return this._extensions.oes_vertex_array_object._activeVertexArrayObject
@@ -2692,6 +2928,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     }
     if (!this._checkPixelBufferArgument(pixels, this.PIXEL_PACK_BUFFER)) { return }
 
+    const resolved = this._beginDefaultFramebufferRead(x, y, width, height)
     super.readPixels(
       x,
       y,
@@ -2700,6 +2937,7 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
       format,
       type,
       pixels)
+    if (resolved) { this._endDefaultFramebufferRead() }
   }
 
   renderbufferStorage (
@@ -2720,6 +2958,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     const renderbuffer = this._activeRenderbuffer
     if (!renderbuffer) {
       this.setError(this.INVALID_OPERATION)
+      return
+    }
+
+    if (!this._isWebGL2() && (internalFormat === RGBA8 || internalFormat === RGB8)) {
+      this.setError(this.INVALID_ENUM)
       return
     }
 
@@ -2756,7 +2999,13 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
 
   swap () {
     if (this._window && this._window.destroyed) { throw new Error('window is destroyed') }
-    if (!super.swap()) { markContextLost(this, false) }
+    const emulated = this._drawingBuffer._framebuffer !== 0
+    if (emulated && !this._presentDrawingBuffer()) { throw new Error('could not present the drawing buffer to the window') }
+    if (!super.swap()) {
+      markContextLost(this, false)
+    } else if (emulated && !this._contextAttributes.preserveDrawingBuffer) {
+      this._clearDrawingBuffer()
+    }
   }
 
   sampleCoverage (value, invert) {
@@ -3094,9 +3343,37 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     return super.viewport(x | 0, y | 0, width | 0, height | 0)
   }
 
+  _windowSurfaceMatchesAlpha () {
+    if (this._contextAttributes.alpha) { return true }
+    super.bindFramebuffer(this.FRAMEBUFFER, 0)
+    return super.getParameter(this.ALPHA_BITS) === 0
+  }
+
   _allocateDrawingBuffer (width, height, hasWindow) {
     this._hasWindow = hasWindow
-    if (hasWindow) {
+    const contextAttributes = this._contextAttributes
+    let samples = 0
+    if (contextAttributes.antialias) {
+      const errors = this._takeErrors()
+      samples = Math.min(MAX_DRAWING_BUFFER_SAMPLES, super.getParameter(MAX_SAMPLES) | 0)
+      this._putErrors(errors)
+      if (samples < 2) {
+        samples = 0
+        contextAttributes.antialias = false
+      }
+    }
+    if (samples) {
+      this._drawingBuffer = new WebGLDrawingBufferWrapper(
+        super.createFramebuffer(),
+        super.createRenderbuffer(),
+        super.createRenderbuffer(),
+        samples,
+        super.createFramebuffer(),
+        super.createTexture())
+      this._resizeDrawingBuffer(width, height)
+      return
+    }
+    if (hasWindow && !this._windowSurfaceIsBare && this._windowSurfaceMatchesAlpha()) {
       this._drawingBuffer = new WebGLDrawingBufferWrapper(0, 0, 0)
       return
     }
