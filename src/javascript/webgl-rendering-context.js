@@ -800,6 +800,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     if (!checkObject(framebuffer)) {
       throw new TypeError('bindFramebuffer(GLenum, WebGLFramebuffer)')
     }
+    if (!this._isFramebufferTarget(target | 0)) {
+      this.setError(this.INVALID_ENUM)
+      return
+    }
     let error = 0
     if (!framebuffer) {
       this._saveError()
@@ -1384,6 +1388,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
   }
 
   checkFramebufferStatus (target) {
+    if (!this._isFramebufferTarget(target | 0)) {
+      this.setError(this.INVALID_ENUM)
+      return 0
+    }
     return super.checkFramebufferStatus(target)
   }
 
@@ -2162,6 +2170,10 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     attachment |= 0
     pname |= 0
 
+    if (!this._isFramebufferTarget(target)) {
+      this.setError(this.INVALID_ENUM)
+      return null
+    }
     // Since we emulate the default framebuffer, we can't rely on ANGLE's validation.
     if (!this._getActiveFramebuffer(target)) {
       this.setError(this.INVALID_OPERATION)
