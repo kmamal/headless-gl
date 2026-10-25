@@ -41,6 +41,31 @@ Contexts created this way have these differences from headless contexts:
 * EGL allows one surface per window, so destroy a window's context before creating another one on the same window.
 
 
+## Worker threads
+
+The addon can be loaded in `worker_threads`, and each thread can create and use its own contexts.
+A context belongs to the thread that created it and is destroyed when that thread exits, even if it was terminated.
+
+An SDL window can only be created on the main thread, but a worker can render to it.
+Post the window's `native` value to the worker, and pass `{ native }` as the `window` option there:
+
+```js
+// main thread
+const window = sdl.video.createWindow({ opengl: true })
+const worker = new Worker('./render.js', { workerData: { native: window.native, width: window.pixelWidth, height: window.pixelHeight } })
+
+// render.js
+const { native, width, height } = workerData
+const gl = createContext(width, height, { window: { native } })
+```
+
+The worker can't see the window, so the main thread has to forward the resize events it needs, and it must stop the worker before it destroys the window.
+
+On Linux, ANGLE's default OpenGL backend runs every context on the same native GLX context, so only one thread at a time may hold contexts: rendering from a worker works as long as the main thread has no contexts of its own.
+Creating a context while another thread holds some throws an error with `code` set to `'ERR_GL_THREAD_CONFLICT'`, for headless contexts too.
+Set `ANGLE_DEFAULT_PLATFORM=vulkan` to use ANGLE's Vulkan backend, which lets several threads render at once.
+
+
 ## WebGL 2
 
 Pass `createWebGL2Context: true` to get a `WebGL2RenderingContext`, headless or in a window.

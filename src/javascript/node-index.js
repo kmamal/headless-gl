@@ -66,7 +66,7 @@ function createContext (width, height, options) {
       contextAttributes.createWebGL2Context,
       windowHandle)
   } catch (e) {
-    if (hasWindow) { throw e }
+    if (hasWindow || e.code === 'ERR_GL_THREAD_CONFLICT') { throw e }
   }
   if (!ctx) {
     return null

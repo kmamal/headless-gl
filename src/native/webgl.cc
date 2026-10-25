@@ -170,8 +170,53 @@ static void MaybeEndRenderDocCapture() {
 
 std::map<void *, EGLDisplay> WebGLRenderingContext::DISPLAY_CACHE;
 std::map<void *, int> WebGLRenderingContext::DISPLAY_REFS;
-WebGLRenderingContext *WebGLRenderingContext::ACTIVE = NULL;
-WebGLRenderingContext *WebGLRenderingContext::CONTEXT_LIST_HEAD = NULL;
+std::mutex WebGLRenderingContext::DISPLAY_MUTEX;
+std::map<std::pair<void *, std::thread::id>, int> WebGLRenderingContext::DISPLAY_THREAD_REFS;
+std::map<void *, bool> WebGLRenderingContext::DISPLAY_MULTITHREADED;
+thread_local WebGLRenderingContext *WebGLRenderingContext::ACTIVE = NULL;
+thread_local WebGLRenderingContext *WebGLRenderingContext::CONTEXT_LIST_HEAD = NULL;
+
+static bool LoadEGLOnce() {
+  static std::once_flag once;
+  static bool loaded = false;
+  std::call_once(once, []() {
+    SharedLibrary *library = new SharedLibrary();
+    if (!library->open("libEGL")) {
+      delete library;
+      return;
+    }
+    ::LoadEGL(library->getFunction<PFNEGLGETPROCADDRESSPROC>("eglGetProcAddress"));
+    loaded = true;
+  });
+  return loaded;
+}
+
+static bool DisplaySupportsThreads(EGLDisplay display) {
+  if (!eglQueryDisplayAttribEXT || !eglQueryDeviceStringEXT) {
+    return false;
+  }
+  EGLAttrib device = 0;
+  if (!eglQueryDisplayAttribEXT(display, EGL_DEVICE_EXT, &device) || !device) {
+    return false;
+  }
+  const char *extensions =
+      eglQueryDeviceStringEXT(reinterpret_cast<EGLDeviceEXT>(device), EGL_EXTENSIONS);
+  if (!extensions) {
+    return false;
+  }
+  for (const char *extension :
+       {"EGL_ANGLE_device_vulkan", "EGL_ANGLE_device_d3d11", "EGL_ANGLE_device_metal"}) {
+    if (strstr(extensions, extension)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void LoadGLESOnce() {
+  static std::once_flag once;
+  std::call_once(once, []() { LoadGLES(eglGetProcAddress); });
+}
 
 #define GL_METHOD(method_name) NAN_METHOD(WebGLRenderingContext::method_name)
 
@@ -226,9 +271,11 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
                                              bool failIfMajorPerformanceCaveat,
                                              bool createWebGL2Context, void *windowHandle)
     : state(GLCONTEXT_STATE_INIT), display(EGL_NO_DISPLAY), displayKey(nullptr),
+      ownerThread(std::this_thread::get_id()),
       swapError(EGL_SUCCESS), context(EGL_NO_CONTEXT), surface(EGL_NO_SURFACE),
       holdsDisplayRef(false), unpack_flip_y(false), unpack_premultiply_alpha(false),
       unpack_colorspace_conversion(0x9244), unpack_alignment(4), isWebGL2(createWebGL2Context),
+      threadConflict(false),
       webGLToANGLEExtensions(&CaseInsensitiveCompare), next(NULL), prev(NULL) {
 
   // Uncomment on Windows to attach debugger
@@ -248,15 +295,10 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   }
 #endif
 
-  if (!eglGetProcAddress) {
-    if (!eglLibrary.open("libEGL")) {
-      errorMessage = "Error opening ANGLE shared library.";
-      state = GLCONTEXT_STATE_ERROR;
-      return;
-    }
-
-    auto getProcAddress = eglLibrary.getFunction<PFNEGLGETPROCADDRESSPROC>("eglGetProcAddress");
-    ::LoadEGL(getProcAddress);
+  if (!LoadEGLOnce()) {
+    errorMessage = "Error opening ANGLE shared library.";
+    state = GLCONTEXT_STATE_ERROR;
+    return;
   }
 
   // Unpack the native window payload
@@ -280,6 +322,7 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
 #endif
 
   // Get display
+  std::unique_lock<std::mutex> displayLock(DISPLAY_MUTEX);
   auto cachedDisplay = DISPLAY_CACHE.find(nativeDisplay);
   bool newDisplay = cachedDisplay == DISPLAY_CACHE.end();
   if (!newDisplay) {
@@ -309,8 +352,23 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
 
     // Save display
     DISPLAY_CACHE[nativeDisplay] = display;
+    DISPLAY_MULTITHREADED[nativeDisplay] = DisplaySupportsThreads(display);
   }
   displayKey = nativeDisplay;
+  DISPLAY_REFS[displayKey]++;
+  DISPLAY_THREAD_REFS[{displayKey, ownerThread}]++;
+  holdsDisplayRef = true;
+
+  // ANGLE's OpenGL backend runs every context on one native context, which
+  // can only be current on one thread at a time
+  bool otherThreads = false;
+  for (const auto &entry : DISPLAY_THREAD_REFS) {
+    if (entry.first.first == displayKey && entry.first.second != ownerThread) {
+      otherThreads = true;
+    }
+  }
+  threadConflict = otherThreads && !DISPLAY_MULTITHREADED[displayKey];
+  displayLock.unlock();
   auto fail = [&](const std::string &message) {
     errorMessage = message;
     state = GLCONTEXT_STATE_ERROR;
@@ -322,11 +380,15 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
       eglDestroyContext(display, context);
       context = EGL_NO_CONTEXT;
     }
-    if (newDisplay) {
-      eglTerminate(display);
-      DISPLAY_CACHE.erase(displayKey);
-    }
+    releaseDisplay(newDisplay);
   };
+
+  if (threadConflict) {
+    fail("Another thread has WebGL contexts, and ANGLE's OpenGL backend can only be used from "
+         "one thread at a time. Set ANGLE_DEFAULT_PLATFORM=vulkan to use contexts from several "
+         "threads.");
+    return;
+  }
 
   // Set up configuration
   EGLint renderableTypeBit = createWebGL2Context ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_ES3_BIT;
@@ -410,12 +472,10 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
 
   // Success
   state = GLCONTEXT_STATE_OK;
-  DISPLAY_REFS[displayKey]++;
-  holdsDisplayRef = true;
   registerContext();
   ACTIVE = this;
 
-  LoadGLES(eglGetProcAddress);
+  LoadGLESOnce();
 
   // Enable the debug callback to debug GL errors.
   // EnableDebugCallback(nullptr);
@@ -648,13 +708,23 @@ void WebGLRenderingContext::releaseEGL() {
     eglDestroyContext(display, context);
     context = EGL_NO_CONTEXT;
   }
-  if (holdsDisplayRef) {
-    holdsDisplayRef = false;
-    if (--DISPLAY_REFS[displayKey] == 0 && displayKey != nullptr) {
-      eglTerminate(display);
-      DISPLAY_CACHE.erase(displayKey);
-      DISPLAY_REFS.erase(displayKey);
-    }
+  releaseDisplay(false);
+}
+
+void WebGLRenderingContext::releaseDisplay(bool terminateDefault) {
+  if (!holdsDisplayRef) {
+    return;
+  }
+  holdsDisplayRef = false;
+  std::lock_guard<std::mutex> guard(DISPLAY_MUTEX);
+  if (--DISPLAY_THREAD_REFS[{displayKey, ownerThread}] == 0) {
+    DISPLAY_THREAD_REFS.erase({displayKey, ownerThread});
+  }
+  if (--DISPLAY_REFS[displayKey] == 0 && (displayKey != nullptr || terminateDefault)) {
+    eglTerminate(display);
+    DISPLAY_CACHE.erase(displayKey);
+    DISPLAY_REFS.erase(displayKey);
+    DISPLAY_MULTITHREADED.erase(displayKey);
   }
 }
 
@@ -665,18 +735,29 @@ GL_METHOD(SetError) {
   inst->setError((GLenum)(Nan::To<int32_t>(info[0]).ToChecked()));
 }
 
-GL_METHOD(DisposeAll) {
-  Nan::HandleScope();
-
+void WebGLRenderingContext::DisposeThreadContexts(void *) {
   while (CONTEXT_LIST_HEAD) {
     CONTEXT_LIST_HEAD->dispose();
   }
 
-  for (auto &entry : WebGLRenderingContext::DISPLAY_CACHE) {
-    eglTerminate(entry.second);
+  std::lock_guard<std::mutex> guard(WebGLRenderingContext::DISPLAY_MUTEX);
+  auto &cache = WebGLRenderingContext::DISPLAY_CACHE;
+  auto &refs = WebGLRenderingContext::DISPLAY_REFS;
+  for (auto it = cache.begin(); it != cache.end();) {
+    if (refs[it->first] == 0) {
+      eglTerminate(it->second);
+      refs.erase(it->first);
+      WebGLRenderingContext::DISPLAY_MULTITHREADED.erase(it->first);
+      it = cache.erase(it);
+    } else {
+      ++it;
+    }
   }
-  WebGLRenderingContext::DISPLAY_CACHE.clear();
-  WebGLRenderingContext::DISPLAY_REFS.clear();
+}
+
+GL_METHOD(DisposeAll) {
+  Nan::HandleScope();
+  DisposeThreadContexts(nullptr);
 }
 
 GL_METHOD(New) {
@@ -704,7 +785,12 @@ GL_METHOD(New) {
   if (instance->state != GLCONTEXT_STATE_OK) {
     if (!instance->errorMessage.empty()) {
       std::string error = std::string("Error creating WebGLContext: ") + instance->errorMessage;
-      return Nan::ThrowError(error.c_str());
+      v8::Local<v8::Value> exception = Nan::Error(error.c_str());
+      if (instance->threadConflict) {
+        Nan::Set(exception.As<v8::Object>(), Nan::New("code").ToLocalChecked(),
+                 Nan::New("ERR_GL_THREAD_CONFLICT").ToLocalChecked());
+      }
+      return Nan::ThrowError(exception);
     } else {
       return Nan::ThrowError("Error creating WebGLContext");
     }

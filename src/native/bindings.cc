@@ -8,7 +8,12 @@
 #include "webgl.h"
 #include <cstdlib>
 
-Nan::Persistent<v8::FunctionTemplate> WEBGL_TEMPLATE;
+static thread_local bool CLEANUP_HOOK_REGISTERED = false;
+
+static void CleanupEnvironment(void *) {
+  CLEANUP_HOOK_REGISTERED = false;
+  WebGLRenderingContext::DisposeThreadContexts(nullptr);
+}
 
 #define JS_GL_METHOD(webgl_name, method_name)                                                      \
   Nan::SetPrototypeTemplate(webgl_template, webgl_name,                                            \
@@ -563,7 +568,6 @@ NAN_MODULE_INIT(Init) {
   JS_CONSTANT(IMPLEMENTATION_COLOR_READ_FORMAT, 0x8B9B);
 
   // Export template
-  WEBGL_TEMPLATE.Reset(webgl_template);
   Nan::Set(target, Nan::New<v8::String>("WebGLRenderingContext").ToLocalChecked(),
            Nan::GetFunction(webgl_template).ToLocalChecked());
 
@@ -573,6 +577,10 @@ NAN_MODULE_INIT(Init) {
   Nan::Set(target, Nan::New<v8::String>("WebGL2Constants").ToLocalChecked(), webgl2Constants);
 
   Nan::Export(target, "cleanup", WebGLRenderingContext::DisposeAll);
+  if (!CLEANUP_HOOK_REGISTERED) {
+    CLEANUP_HOOK_REGISTERED = true;
+    node::AddEnvironmentCleanupHook(v8::Isolate::GetCurrent(), CleanupEnvironment, nullptr);
+  }
   Nan::Export(target, "setError", WebGLRenderingContext::SetError);
 }
 
@@ -848,4 +856,4 @@ void BindWebGL2(v8::Local<v8::Object> target) {
   JS_SET_GL_CONSTANT(RGBA8);
 }
 
-NODE_MODULE(webgl, Init)
+NAN_MODULE_WORKER_ENABLED(webgl, Init)

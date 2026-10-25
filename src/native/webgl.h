@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <map>
+#include <mutex>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -69,10 +71,13 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   // needs its own EGLDisplay).
   static std::map<void *, EGLDisplay> DISPLAY_CACHE;
   static std::map<void *, int> DISPLAY_REFS;
+  static std::mutex DISPLAY_MUTEX;
+  static std::map<std::pair<void *, std::thread::id>, int> DISPLAY_THREAD_REFS;
+  static std::map<void *, bool> DISPLAY_MULTITHREADED;
 
-  SharedLibrary eglLibrary;
   EGLDisplay display;
   void *displayKey;
+  std::thread::id ownerThread;
   EGLint swapError;
   EGLContext context;
   EGLConfig config;
@@ -87,6 +92,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   GLint unpack_colorspace_conversion;
   GLint unpack_alignment;
   bool isWebGL2;
+  bool threadConflict;
 
   std::set<std::string> requestableExtensions;
   std::set<std::string> enabledExtensions;
@@ -100,7 +106,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
 
   // Context list
   WebGLRenderingContext *next, *prev;
-  static WebGLRenderingContext *CONTEXT_LIST_HEAD;
+  static thread_local WebGLRenderingContext *CONTEXT_LIST_HEAD;
   void registerContext() {
     if (CONTEXT_LIST_HEAD) {
       CONTEXT_LIST_HEAD->prev = this;
@@ -133,9 +139,10 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   bool restoreContext();
   void loadExtensions();
   void releaseEGL();
+  void releaseDisplay(bool terminateDefault);
 
   // Context validation
-  static WebGLRenderingContext *ACTIVE;
+  static thread_local WebGLRenderingContext *ACTIVE;
   bool setActive();
 
   // Unpacks a buffer full of pixels into memory
@@ -156,6 +163,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   // Destructors
   void dispose();
 
+  static void DisposeThreadContexts(void *);
   static NAN_METHOD(DisposeAll);
 
   static NAN_METHOD(New);

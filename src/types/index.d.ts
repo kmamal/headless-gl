@@ -69,7 +69,7 @@ declare namespace createContext {
 	export type AllowSharedBufferSource = ArrayBuffer | ArrayBufferView;
 
 	export interface SDLWindow {
-		readonly destroyed: boolean;
+		readonly destroyed?: boolean;
 		readonly native: unknown;
 	}
 
