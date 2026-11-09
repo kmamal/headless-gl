@@ -836,6 +836,17 @@ GL_METHOD(RestoreContext) {
   info.GetReturnValue().Set(inst->restoreContext());
 }
 
+GL_METHOD(SetSwapInterval) {
+  GL_BOILERPLATE;
+
+  EGLint interval = Nan::To<int32_t>(info[0]).FromMaybe(1);
+  if (inst->state != GLCONTEXT_STATE_OK || inst->surface == EGL_NO_SURFACE) {
+    info.GetReturnValue().Set(false);
+    return;
+  }
+  info.GetReturnValue().Set(eglSwapInterval(inst->display, interval) == EGL_TRUE);
+}
+
 GL_METHOD(Swap) {
   GL_BOILERPLATE;
 

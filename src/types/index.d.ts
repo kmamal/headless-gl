@@ -590,6 +590,7 @@ declare namespace createContext {
 
 	export interface WindowRenderingContext {
 		swap(): undefined;
+		setSwapInterval(interval: number): boolean;
 	}
 
 	export interface STACKGL_destroy_context {

@@ -36,6 +36,7 @@ Call `createContext` with the `window` option. The window must be have been crea
 Contexts created this way have these differences from headless contexts:
 
 * `gl.swap()` presents the frame.
+* `gl.setSwapInterval(interval)` enables V-Sync, `1` turns it on, `0` turns it off. Returns `false` if the driver rejected it.
 * `drawingBufferWidth` and `drawingBufferHeight` do not follow the window. When the window is resized, call `gl.getExtension('STACKGL_resize_drawingbuffer').resize(pixelWidth, pixelHeight)` to update them.
 * Destroy the context with `gl.getExtension('STACKGL_destroy_context').destroy()` before destroying the window.
 * EGL allows one surface per window, so destroy a window's context before creating another one on the same window.
