@@ -79,7 +79,7 @@ Set `ANGLE_DEFAULT_PLATFORM=vulkan` to use ANGLE's Vulkan backend, which lets se
 ### WebGL 2
 
 Pass `createWebGL2Context: true` to get a `WebGL2RenderingContext`, headless or in a window.
-The implementation does not currently pass the full conformance test, but it's enough to get [Three.js](https://github.com/kmamal/three#readme) working.
+The implementation does not currently pass the full conformance test, but it's enough to get [Three.js](https://github.com/kmamal/three.js#readme) working.
 
 
 ### Extensions
