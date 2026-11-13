@@ -41,6 +41,7 @@ NAN_MODULE_INIT(Init) {
   JS_GL_METHOD("_vertexAttribDivisorANGLE", VertexAttribDivisorANGLE);
 
   JS_GL_METHOD("swap", Swap);
+  JS_GL_METHOD("setSwapInterval", SetSwapInterval);
   JS_GL_METHOD("_restoreContext", RestoreContext);
 
   JS_GL_METHOD("getUniform", GetUniform);

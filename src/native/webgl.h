@@ -172,6 +172,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(Destroy);
 
   static NAN_METHOD(Swap);
+  static NAN_METHOD(SetSwapInterval);
   static NAN_METHOD(RestoreContext);
 
   static NAN_METHOD(VertexAttribDivisorANGLE);

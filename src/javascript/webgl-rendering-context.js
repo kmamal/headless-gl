@@ -157,7 +157,7 @@ function wrapContext (ctx) {
   const masked = ctx._isWebGL2() ? webgl1OnlyMethods : webgl2OnlyMethods
   let hidden = privateMethods.concat(masked)
   if (!ctx._hasWindow) {
-    hidden = hidden.concat(['swap'])
+    hidden = hidden.concat(['swap', 'setSwapInterval'])
   }
   let proto = ctx
   while (proto && proto !== Object.prototype) {
@@ -3006,6 +3006,11 @@ class WebGLRenderingContextHelper extends NativeWebGLRenderingContext {
     } else if (emulated && !this._contextAttributes.preserveDrawingBuffer) {
       this._clearDrawingBuffer()
     }
+  }
+
+  setSwapInterval (interval) {
+    if (this._window && this._window.destroyed) { throw new Error('window is destroyed') }
+    return super.setSwapInterval(interval | 0)
   }
 
   sampleCoverage (value, invert) {
