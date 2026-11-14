@@ -31,12 +31,12 @@
   "dependencies": {
     "bit-twiddle": "1.0.2",
     "glsl-tokenizer": "2.1.5",
-    "modern-tar": "0.8.4"
+    "modern-tar": "0.8.6"
   },
   "devDependencies": {
     "@kmamal/gl-conformance": "2.1.4",
-    "nan": "2.27.0",
-    "node-gyp": "12.3.0",
+    "nan": "2.30.0",
+    "node-gyp": "13.1.0",
     "tape": "5.10.3"
   },
   "repository": {
