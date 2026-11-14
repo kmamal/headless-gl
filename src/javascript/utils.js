@@ -174,7 +174,21 @@ function unpackTypedArray (array) {
     array.byteLength + array.byteOffset)
 }
 
+function extractVideoFrame (video) {
+  const frame = video.currentFrame
+  if (frame == null) {
+    return { width: 0, height: 0, data: new Uint8Array(0) }
+  }
+  if (frame.format !== undefined && frame.format !== 'rgba') {
+    return null
+  }
+  return frame
+}
+
 function extractImageData (pixels) {
+  if (pixels !== null && typeof pixels === 'object' && 'currentFrame' in pixels) {
+    return extractVideoFrame(pixels)
+  }
   if (typeof pixels === 'object' && typeof pixels.width !== 'undefined' && typeof pixels.height !== 'undefined') {
     if (typeof pixels.data !== 'undefined') {
       return pixels
@@ -340,7 +354,29 @@ function imagePixelEncoder (format, type) {
   }
 }
 
+function copyImageRows (image, region, flipY) {
+  const { x, y, width, height, depth, imageHeight } = region
+  const data = image.data
+  const source = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+  const rowLength = width * 4
+  const out = new Uint8Array(rowLength * height * depth)
+  let i = 0
+  for (let z = 0; z < depth; ++z) {
+    for (let row = 0; row < height; ++row) {
+      const offsetRow = y + z * imageHeight + row
+      const sourceRow = flipY ? image.height - 1 - offsetRow : offsetRow
+      const s = (sourceRow * image.width + x) * 4
+      out.set(source.subarray(s, s + rowLength), i)
+      i += rowLength
+    }
+  }
+  return out
+}
+
 function packImageSource (image, region, format, type, flipY, premultiply) {
+  if (format === gl.RGBA && type === gl.UNSIGNED_BYTE && !premultiply) {
+    return copyImageRows(image, region, flipY)
+  }
   const encoder = imagePixelEncoder(format, type)
   if (!encoder) return null
   const { x, y, width, height, depth, imageHeight } = region
