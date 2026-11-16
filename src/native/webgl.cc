@@ -328,14 +328,21 @@ WebGLRenderingContext::WebGLRenderingContext(int width, int height, bool alpha, 
   if (!newDisplay) {
     display = cachedDisplay->second;
   } else {
+    static const char *enabledFeatures[] = {"clampPointSize", nullptr};
     if (nativeDisplay) {
       // ANGLE only serves Wayland from its Vulkan backend, and picks it only
       // when asked for explicitly
       EGLAttrib displayAttribs[] = {EGL_PLATFORM_ANGLE_TYPE_ANGLE,
-                                    EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE, EGL_NONE};
+                                    EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE,
+                                    EGL_FEATURE_OVERRIDES_ENABLED_ANGLE,
+                                    reinterpret_cast<EGLAttrib>(enabledFeatures), EGL_NONE};
       display = eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_EXT, nativeDisplay, displayAttribs);
     } else {
-      display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+      EGLAttrib displayAttribs[] = {EGL_FEATURE_OVERRIDES_ENABLED_ANGLE,
+                                    reinterpret_cast<EGLAttrib>(enabledFeatures), EGL_NONE};
+      display = eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE,
+                                      reinterpret_cast<void *>(EGL_DEFAULT_DISPLAY),
+                                      displayAttribs);
     }
     if (display == EGL_NO_DISPLAY) {
       errorMessage = "Error retrieving EGL display.";
